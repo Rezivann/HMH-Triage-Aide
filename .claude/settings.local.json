@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p back-end/src/middleware back-end/src/controllers back-end/src/routes back-end/src/services back-end/src/models back-end/src/utils back-end/src/jobs back-end/src/websocket back-end/src/config back-end/tests)",
+      "Bash(mkdir -p front-end/src/modes/kiosk/components front-end/src/modes/kiosk/hooks front-end/src/modes/dashboard/components front-end/src/modes/dashboard/hooks front-end/src/modes/track/components front-end/src/modes/track/hooks front-end/src/shared/api front-end/src/shared/components front-end/src/shared/styles front-end/public)",
+      "Bash(mkdir -p ml-service/app/routes ml-service/app/services ml-service/app/models ml-service/tests)",
+      "Bash(cd \"c:\\\\Users\\\\reziv\\\\OneDrive\\\\Documents\\\\GitHub\\\\LLMTriage\" && \\\\ *)"
+    ]
+  }
+}
