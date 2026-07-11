@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { checkPhotoQuality } from './QualityCheck';
+import NailBoxSelector from './NailBoxSelector';
 
 // On-kiosk camera fallback for patients without a phone. Captures a still
-// frame and runs the on-device quality check, then hands off to the parent
-// to submit. Actual image upload to the CV pipeline isn't wired up yet -
-// POST /kiosk/photo doesn't accept image bytes until CvServiceClient and
-// ml-service exist for real (see back-end/src/services/CvServiceClient.js).
+// frame, runs the on-device quality check, then hands off to NailBoxSelector
+// so the patient can box the nail of the finger they're pointing at the
+// wound with (SAM's segmentation prompt) before anything is submitted.
+// Actual image upload to the CV pipeline isn't wired up yet - POST
+// /kiosk/photo doesn't accept image bytes until CvServiceClient and
+// ml-service exist for real (see back-end/src/services/CvServiceClient.js) -
+// nailBox is passed upward regardless so the wiring is ready once that lands.
 export default function PhotoCaptureFallback({ onCaptured }) {
   const videoRef = useRef(null);
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(false);
+  const [capturedBlob, setCapturedBlob] = useState(null);
 
   useEffect(() => {
     let stream;
@@ -43,7 +48,18 @@ export default function PhotoCaptureFallback({ onCaptured }) {
       return;
     }
 
-    onCaptured(blob);
+    setCapturedBlob(blob);
+  }
+
+  if (capturedBlob) {
+    return (
+      <NailBoxSelector
+        imageBlob={capturedBlob}
+        onRetake={() => setCapturedBlob(null)}
+        onConfirm={({ nailBox }) => onCaptured({ blob: capturedBlob, nailBox })}
+        onSkip={() => onCaptured({ blob: capturedBlob, nailBox: null })}
+      />
+    );
   }
 
   return (

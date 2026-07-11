@@ -21,8 +21,11 @@ export default function KioskApp() {
     setStep(STEPS.END);
   }
 
-  async function handleFallbackCaptured() {
-    await submitPhoto();
+  async function handleFallbackCaptured({ nailBox }) {
+    // blob itself still isn't uploaded (see PhotoCaptureFallback's header
+    // comment) - nailBox goes through as an override now so the wiring is
+    // in place once CvServiceClient actually sends image bytes.
+    await submitPhoto({ nailBox });
     setStep(STEPS.END);
   }
 

@@ -1,6 +1,6 @@
 const store = require('./fakeSessionStore');
+const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const { sortQueue } = require('../utils/queueSort');
-const { decayWeightPerMinute, scoreDecayCap } = require('../config/env');
 
 function getStatus(req, res) {
   const { sessionId } = req.track;
@@ -16,7 +16,7 @@ function getStatus(req, res) {
   // keep in sync). Exposes this patient's own position only - never score,
   // findings, or any other patient's data.
   const queued = store.listSessions({ locationIds: [session.locationId] }).filter((s) => s.rawScore !== null);
-  const ranked = sortQueue(queued, { now: new Date(), decayWeightPerMinute, scoreDecayCap });
+  const ranked = sortQueue(queued, { now: new Date(), categoryDecay: acuityPolicyStore.getCategoryDecay() });
   const mine = ranked.find((s) => s.sessionId === sessionId);
 
   const status = mine?.position === 1 ? 'next' : 'waiting';

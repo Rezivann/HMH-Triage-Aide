@@ -1,6 +1,6 @@
 const { sortQueue } = require('../src/utils/queueSort');
 
-const CONFIG = { decayWeightPerMinute: 0.5, scoreDecayCap: 50 };
+const CONFIG = { categoryDecay: { unclassified: { rate: 0.5, cap: 50 } } };
 
 function randomSession(id, now) {
   const hasFloor = Math.random() < 0.3;

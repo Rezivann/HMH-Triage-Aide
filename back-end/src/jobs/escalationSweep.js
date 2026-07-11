@@ -1,6 +1,6 @@
 const store = require('../controllers/fakeSessionStore');
+const acuityPolicyStore = require('../controllers/fakeAcuityPolicyStore');
 const { sortQueue } = require('../utils/queueSort');
-const { decayWeightPerMinute, scoreDecayCap } = require('../config/env');
 
 // Not for sorting - the dashboard already re-sorts on every GET /dashboard/queue
 // read via utils/queueSort.js. This job exists for the two things a read-time
@@ -8,8 +8,8 @@ const { decayWeightPerMinute, scoreDecayCap } = require('../config/env');
 // catching abnormal waits as a safety valve regardless of score.
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
-// TODO: move to a per-category clinical lookup, same as DECAY_WEIGHT_PER_MINUTE,
-// once categories flow through from CV findings.
+// TODO: move to a per-category clinical lookup, same as fakeAcuityPolicyStore.js's
+// decayWeightPerMinute, once categories flow through from CV findings.
 const ABNORMAL_WAIT_MINUTES = 60;
 
 let intervalHandle = null;
@@ -26,7 +26,7 @@ function minutesWaited(session, now) {
 
 function sweep({ now = new Date() } = {}) {
   const queued = store.listSessions().filter((s) => s.rawScore !== null && s.status === 'queued');
-  const ranked = sortQueue(queued, { now, decayWeightPerMinute, scoreDecayCap });
+  const ranked = sortQueue(queued, { now, categoryDecay: acuityPolicyStore.getCategoryDecay() });
 
   const abnormalWaits = ranked.filter((s) => minutesWaited(s, now) > ABNORMAL_WAIT_MINUTES);
 

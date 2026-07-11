@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const store = require('./fakeSessionStore');
+const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const { sortQueue } = require('../utils/queueSort');
 const { pinConflictCheck } = require('../utils/pinConflictCheck');
-const { decayWeightPerMinute, scoreDecayCap, nurseSessionSecret } = require('../config/env');
+const { nurseSessionSecret } = require('../config/env');
 
 // Dev-only stand-in for real Duo SSO - mints a nurse session token directly.
 // Not gated behind nurseAuth (there's no session yet to validate); the route
@@ -20,9 +21,31 @@ function listQueue(req, res) {
   const { siteAccess } = req.nurse;
 
   const queued = store.listSessions({ locationIds: siteAccess }).filter((s) => s.rawScore !== null);
-  const ranked = sortQueue(queued, { now: new Date(), decayWeightPerMinute, scoreDecayCap });
+  const ranked = sortQueue(queued, { now: new Date(), categoryDecay: acuityPolicyStore.getCategoryDecay() });
 
   res.json({ queue: ranked });
+}
+
+function getAcuityPolicy(req, res) {
+  res.json(acuityPolicyStore.getPolicy());
+}
+
+// Global clinical policy, not a per-patient action - still note-required and
+// audited the same way an override is, since it changes how every future
+// (and every currently-queued) patient's score is computed.
+function updateAcuityPolicy(req, res) {
+  const { categories, adjustmentRange, note } = req.body;
+  const { nurseId } = req.nurse;
+
+  if (!note) {
+    return res.status(400).json({ error: 'note_required' });
+  }
+  if (adjustmentRange !== undefined && (typeof adjustmentRange !== 'number' || adjustmentRange < 0)) {
+    return res.status(400).json({ error: 'invalid_adjustment_range' });
+  }
+
+  const updated = acuityPolicyStore.updatePolicy({ categories, adjustmentRange, nurseId, note });
+  res.json(updated);
 }
 
 function getSessionDetail(req, res) {
@@ -80,4 +103,4 @@ function override(req, res) {
   res.json(updated);
 }
 
-module.exports = { devLogin, listQueue, getSessionDetail, claim, override };
+module.exports = { devLogin, listQueue, getSessionDetail, claim, override, getAcuityPolicy, updateAcuityPolicy };

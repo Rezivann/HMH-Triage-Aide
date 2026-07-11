@@ -1,6 +1,6 @@
 const { computeEffectiveScore, sortQueue } = require('../src/utils/queueSort');
 
-const CONFIG = { decayWeightPerMinute: 1, scoreDecayCap: 50 };
+const CONFIG = { categoryDecay: { unclassified: { rate: 1, cap: 50 } } };
 
 describe('computeEffectiveScore', () => {
   const now = new Date('2026-01-01T00:30:00Z');
@@ -10,7 +10,7 @@ describe('computeEffectiveScore', () => {
     expect(computeEffectiveScore(session, { now, ...CONFIG })).toBe(40); // 10 + 30 * 1
   });
 
-  it('caps decay at scoreDecayCap no matter how long the wait', () => {
+  it('caps decay at the category cap no matter how long the wait', () => {
     const session = { rawScore: 10, queuedAt: '2025-12-31T00:00:00Z', override: null };
     expect(computeEffectiveScore(session, { now, ...CONFIG })).toBe(60); // 10 + cap(50)
   });
@@ -67,5 +67,16 @@ describe('sortQueue', () => {
     };
     const score = computeEffectiveScore(flooredOld, { now, ...CONFIG });
     expect(score).toBe(60); // still decays up to the cap, same as anyone else
+  });
+
+  it('on a tied effectiveScore, whoever has been waiting longer ranks first', () => {
+    const sessions = [
+      // Both hit the decay cap (60), so their effectiveScore ties exactly -
+      // 'earlier' queued well before 'later', so it should still win the tie.
+      { sessionId: 'later', rawScore: 10, queuedAt: '2025-12-31T12:00:00Z', override: null, autoFloor: null },
+      { sessionId: 'earlier', rawScore: 10, queuedAt: '2025-12-30T00:00:00Z', override: null, autoFloor: null },
+    ];
+    const ranked = sortQueue(sessions, { now, ...CONFIG });
+    expect(ranked.map((s) => s.sessionId)).toEqual(['earlier', 'later']);
   });
 });

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const store = require('./fakeSessionStore');
+const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const { forceEscalate, shouldAutoFloor } = require('../services/ReviewRoutingService');
 const { trackTokenSecret } = require('../config/env');
 
@@ -56,7 +57,9 @@ function postPhoto(req, res) {
   };
 
   // TODO: once services/CvServiceClient + LlmService.synthesizeAcuity() are wired
-  // in for real, rawScore below comes from LlmService instead of a constant.
+  // in for real, rawScore/decayCategory below come from LlmService instead of
+  // a constant - laceration_minor is used here only because it matches this
+  // fake result's hardcoded woundType above.
   if (forceEscalate(fakeCvResult.findings)) {
     return res.status(202).json({
       session: store.updateSession(sessionId, { status: 'force_escalated' }),
@@ -65,9 +68,11 @@ function postPhoto(req, res) {
     });
   }
 
+  const decayCategory = 'laceration_minor';
   const updated = store.updateSession(sessionId, {
     status: 'queued',
-    rawScore: 42,
+    rawScore: acuityPolicyStore.getCategory(decayCategory).baselineScore,
+    decayCategory,
     queuedAt: new Date().toISOString(),
     autoFloor: shouldAutoFloor(confidenceMeta)
       ? { active: true, flooredAt: new Date().toISOString() }

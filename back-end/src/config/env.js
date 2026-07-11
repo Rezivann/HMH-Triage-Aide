@@ -28,9 +28,10 @@ module.exports = {
   // Tracker auth (trackAuth.js) - short-lived single-session scoped token
   trackTokenSecret: optional('TRACK_TOKEN_SECRET', 'dev-insecure-track-secret'),
 
-  // LlmService - conversation + acuity synthesis
+  // LlmService - conversation + acuity synthesis (Anthropic Messages API)
   llmApiKey: optional('LLM_API_KEY', null),
-  llmModel: optional('LLM_MODEL', 'gpt-4o'),
+  llmModel: optional('LLM_MODEL', 'claude-haiku-4-5'),
+  llmApiVersion: optional('LLM_API_VERSION', '2023-06-01'),
 
   // CvServiceClient - ml-service base URL
   cvServiceUrl: optional('CV_SERVICE_URL', 'http://localhost:8000'),
@@ -40,10 +41,10 @@ module.exports = {
   webexCcClientSecret: optional('WEBEX_CC_CLIENT_SECRET', null),
   webexCcOrgId: optional('WEBEX_CC_ORG_ID', null),
 
-  // Queue scoring (utils/queueSort.js)
-  // effectiveScore = rawScore + min(minutesWaited * decayWeightPerMinute, scoreDecayCap)
-  // decayWeightPerMinute is a flat placeholder here - production authors this as a
-  // per-category/finding lookup table with the clinical team, not a single constant.
-  decayWeightPerMinute: parseFloat(optional('DECAY_WEIGHT_PER_MINUTE', '0.5')),
-  scoreDecayCap: parseInt(optional('SCORE_DECAY_CAP', '50'), 10),
+  // Queue scoring (utils/queueSort.js) - effectiveScore = rawScore +
+  // min(minutesWaited * rate, cap), both rate and cap looked up per category
+  // from controllers/fakeAcuityPolicyStore.js (nurse-editable from the
+  // dashboard). No global decay cap anymore - each category bounds its own
+  // ceiling (a bruise should never approach the 0-1000 scale's top purely
+  // from waiting, while active hemorrhage can).
 };

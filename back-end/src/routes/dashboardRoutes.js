@@ -17,5 +17,7 @@ router.get('/queue', dashboardController.listQueue);
 router.get('/session/:id', dashboardController.getSessionDetail);
 router.post('/claim/:id', dashboardController.claim);
 router.post('/override/:id', dashboardController.override);
+router.get('/acuity-policy', dashboardController.getAcuityPolicy);
+router.put('/acuity-policy', dashboardController.updateAcuityPolicy);
 
 module.exports = router;

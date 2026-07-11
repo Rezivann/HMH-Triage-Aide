@@ -1,0 +1,120 @@
+// Temporary in-memory stand-in for a persisted, nurse-editable clinical policy -
+// same "fake store" pattern as fakeSessionStore.js, replace with a real model
+// once models/ and a real database layer exist.
+//
+// Scale: 0-1000, where 1000 represents a patient at the brink of death. Three
+// knobs nurses control from the dashboard (dashboardController's
+// getAcuityPolicy/updateAcuityPolicy), per category:
+//   - baselineScore: severity at intake, before any wait
+//   - decayWeightPerMinute: how fast urgency climbs per minute waited
+//   - decayCap: the most decay alone can ever add for this category, i.e.
+//     even after an infinite wait, decay contribution never exceeds this -
+//     a bruise should never drift near "brink of death" purely from sitting
+//     in a waiting room, no matter how long
+// decayWeightPerMinute is derived as decayCap / (clinically-estimated minutes
+// for this category to go untreated from baseline to that category's ceiling)
+// - see the per-category comments below. These are starting estimates for a
+// demo, not a clinically validated table; a real deployment authors this
+// with the hospital's clinical staff, same as the original brief intended
+// for decay generally.
+//
+// A global adjustmentRange also lives here, bounding how far
+// LlmService.synthesizeAcuity's Claude call can nudge a category's baseline
+// for a specific patient's narrative - Claude picks the category and the
+// nudge, never baselineScore/decayWeightPerMinute/decayCap themselves.
+const DEFAULT_POLICY = {
+  adjustmentRange: 100,
+  categories: {
+    // Uncontrolled active bleeding can be fatal within roughly 30 minutes
+    // without intervention (trauma "golden hour" reasoning) - ceiling
+    // 750 + 250 = 1000, reached in 30 min -> 250/30.
+    active_hemorrhage: {
+      label: 'Active bleeding',
+      baselineScore: 750,
+      decayWeightPerMinute: 8.33,
+      decayCap: 250,
+    },
+    // Open fracture: infection/blood-loss complications can become
+    // extremely dangerous over a few hours if untreated - ceiling
+    // 550 + 300 = 850 over 240 min (4h) -> 300/240.
+    bone_visible: {
+      label: 'Bone visible / suspected fracture',
+      baselineScore: 550,
+      decayWeightPerMinute: 1.25,
+      decayCap: 300,
+    },
+    // Closed deformity/dislocation: secondary complications (e.g.
+    // compartment syndrome) build slowly over many hours - ceiling
+    // 350 + 150 = 500 over 480 min (8h) -> 150/480.
+    deformity: {
+      label: 'Deformity',
+      baselineScore: 350,
+      decayWeightPerMinute: 0.31,
+      decayCap: 150,
+    },
+    // Minor laceration: infection risk only, over a long horizon - ceiling
+    // 150 + 60 = 210 over 360 min (6h) -> 60/360.
+    laceration_minor: {
+      label: 'Minor laceration',
+      baselineScore: 150,
+      decayWeightPerMinute: 0.17,
+      decayCap: 60,
+    },
+    // Bruise/contusion: essentially never becomes life-threatening from
+    // waiting alone - ceiling 60 + 30 = 90 over 480 min (8h) -> 30/480.
+    contusion: {
+      label: 'Bruise / contusion',
+      baselineScore: 60,
+      decayWeightPerMinute: 0.06,
+      decayCap: 30,
+    },
+    // Fallback for sessions with no decayCategory assigned yet (e.g. the
+    // kiosk's current fake CV result). Erring cautious since the true
+    // severity is unknown - ceiling 250 + 250 = 500 over 120 min (2h) ->
+    // 250/120.
+    unclassified: {
+      label: 'Unclassified (fallback)',
+      baselineScore: 250,
+      decayWeightPerMinute: 2.08,
+      decayCap: 250,
+    },
+  },
+};
+
+let policy = JSON.parse(JSON.stringify(DEFAULT_POLICY));
+let lastChanged = null;
+
+function getPolicy() {
+  return { adjustmentRange: policy.adjustmentRange, categories: policy.categories, lastChanged };
+}
+
+// Plain { categoryKey: { rate, cap } } map - kept separate from the full
+// policy object so utils/queueSort.js can stay pure (no store import) and
+// take this as ordinary data, same as it always has.
+function getCategoryDecay() {
+  return Object.fromEntries(
+    Object.entries(policy.categories).map(([key, c]) => [key, { rate: c.decayWeightPerMinute, cap: c.decayCap }])
+  );
+}
+
+function getCategory(key) {
+  return policy.categories[key] || policy.categories.unclassified;
+}
+
+// Only patches keys that already exist - a typo'd or unknown category key
+// is silently ignored rather than creating a new, unlabeled category.
+function updatePolicy({ categories, adjustmentRange, nurseId, note }) {
+  if (categories) {
+    Object.entries(categories).forEach(([key, patch]) => {
+      if (!policy.categories[key]) return;
+      policy.categories[key] = { ...policy.categories[key], ...patch };
+    });
+  }
+  if (typeof adjustmentRange === 'number') {
+    policy.adjustmentRange = adjustmentRange;
+  }
+  lastChanged = { nurseId, note, at: new Date().toISOString() };
+  return getPolicy();
+}
+
+module.exports = { getPolicy, getCategoryDecay, getCategory, updatePolicy, DEFAULT_POLICY };
