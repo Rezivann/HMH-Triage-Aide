@@ -1,4 +1,4 @@
-const store = require('../controllers/fakeSessionStore');
+const store = require('../services/SessionStore');
 const acuityPolicyStore = require('../controllers/fakeAcuityPolicyStore');
 const { sortQueue } = require('../utils/queueSort');
 
@@ -24,14 +24,18 @@ function minutesWaited(session, now) {
   return (now - new Date(session.queuedAt)) / 60000;
 }
 
-function sweep({ now = new Date() } = {}) {
-  const queued = store.listSessions().filter((s) => s.rawScore !== null && s.status === 'queued');
+async function sweep({ now = new Date() } = {}) {
+  const sessions = await store.listSessions();
+  const queued = sessions.filter((s) => s.rawScore !== null && s.status === 'queued');
   const ranked = sortQueue(queued, { now, categoryDecay: acuityPolicyStore.getCategoryDecay() });
 
   const abnormalWaits = ranked.filter((s) => minutesWaited(s, now) > ABNORMAL_WAIT_MINUTES);
 
-  // TODO: persist a ReviewFlag document per abnormal wait once models/ is
-  // wired in (currently just broadcast, so the dashboard reacts immediately).
+  // createReviewFlag is idempotent (upserts on sessionId+reason+unresolved),
+  // so this is safe to call every sweep for as long as a wait stays
+  // abnormal - only the first sweep that notices actually persists anything.
+  await Promise.all(abnormalWaits.map((s) => store.createReviewFlag(s.sessionId, 'abnormal_wait')));
+
   if (broadcastFn) {
     broadcastFn({
       type: 'queue_update',
@@ -50,7 +54,9 @@ function sweep({ now = new Date() } = {}) {
 
 function start() {
   if (intervalHandle) return;
-  intervalHandle = setInterval(() => sweep(), SWEEP_INTERVAL_MS);
+  intervalHandle = setInterval(() => {
+    sweep().catch((err) => console.error('[escalationSweep] sweep failed:', err));
+  }, SWEEP_INTERVAL_MS);
 }
 
 function stop() {

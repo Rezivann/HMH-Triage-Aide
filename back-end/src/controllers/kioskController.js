@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const store = require('./fakeSessionStore');
+const store = require('../services/SessionStore');
 const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const CvServiceClient = require('../services/CvServiceClient');
 const LlmService = require('../services/LlmService');
@@ -9,9 +9,9 @@ const { trackTokenSecret, photoTokenSecret } = require('../config/env');
 const cvServiceClient = new CvServiceClient();
 const llmService = new LlmService();
 
-function createSession(req, res) {
+async function createSession(req, res) {
   const { kioskId, locationId } = req.kiosk;
-  const session = store.createSession({ kioskId, locationId });
+  const session = await store.createSession({ kioskId, locationId });
 
   // Minted once at session creation so the kiosk can build the tracker QR
   // (EndScreen) without a separate round-trip - same secret trackAuth.js
@@ -29,12 +29,12 @@ function createSession(req, res) {
 
 async function postMessage(req, res) {
   const { sessionId, message } = req.body;
-  const session = store.getSession(sessionId);
+  const session = await store.getSession(sessionId);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   try {
     const { reply, status: intakeStatus } = await llmService.sendMessage(session, message);
-    const updated = store.updateSession(sessionId, {
+    const updated = await store.updateSession(sessionId, {
       messages: [...session.messages, { role: 'patient', text: message }, { role: 'assistant', text: reply }],
     });
 
@@ -65,7 +65,7 @@ async function postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox
 
   if (forceEscalate(findings.findings)) {
     return res.status(202).json({
-      session: store.updateSession(session.sessionId, { status: 'force_escalated' }),
+      session: await store.updateSession(session.sessionId, { status: 'force_escalated' }),
       cv: findings,
       escalated: true,
     });
@@ -80,7 +80,7 @@ async function postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox
 
   const acuity = await llmService.synthesizeAcuity(narrative, findings.findings);
 
-  const updated = store.updateSession(session.sessionId, {
+  const updated = await store.updateSession(session.sessionId, {
     status: 'queued',
     rawScore: acuity.rawScore,
     decayCategory: acuity.category,
@@ -97,7 +97,7 @@ async function postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox
 // (auto-floor, force-escalate, queue ranking) without a real photo, ml-service,
 // or any API keys - kept alongside the real path above rather than replaced by
 // it, since testing the scoring/queue logic shouldn't require live CV/LLM calls.
-function postFakePhoto(req, res, session, { confidenceMeta: confidenceOverride, hardFlags }) {
+async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOverride, hardFlags }) {
   const confidenceMeta = {
     cvConfidence: 0.82,
     llmConfidence: 0.78,
@@ -115,14 +115,14 @@ function postFakePhoto(req, res, session, { confidenceMeta: confidenceOverride, 
 
   if (forceEscalate(fakeCvResult.findings)) {
     return res.status(202).json({
-      session: store.updateSession(session.sessionId, { status: 'force_escalated' }),
+      session: await store.updateSession(session.sessionId, { status: 'force_escalated' }),
       cv: fakeCvResult,
       escalated: true,
     });
   }
 
   const decayCategory = 'laceration_minor';
-  const updated = store.updateSession(session.sessionId, {
+  const updated = await store.updateSession(session.sessionId, {
     status: 'queued',
     rawScore: acuityPolicyStore.getCategory(decayCategory).baselineScore,
     decayCategory,
@@ -146,7 +146,7 @@ function postFakePhoto(req, res, session, { confidenceMeta: confidenceOverride, 
 // same as it would for any other submission.
 async function postNoPhoto(req, res) {
   const { sessionId } = req.body;
-  const session = store.getSession(sessionId);
+  const session = await store.getSession(sessionId);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   try {
@@ -164,7 +164,7 @@ async function postNoPhoto(req, res) {
       findingsAgreement: true,
     };
 
-    const updated = store.updateSession(sessionId, {
+    const updated = await store.updateSession(sessionId, {
       status: 'queued',
       rawScore: acuity.rawScore,
       decayCategory: acuity.category,
@@ -182,7 +182,7 @@ async function postNoPhoto(req, res) {
 // them is how sessionId is authorized (kiosk device key + body field, vs. a
 // session-scoped photo token in the URL), never the pipeline itself.
 async function submitPhoto(req, res, sessionId, { imageBase64, nailBox, woundBox, confidenceMeta, hardFlags }) {
-  const session = store.getSession(sessionId);
+  const session = await store.getSession(sessionId);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   try {
@@ -192,7 +192,7 @@ async function submitPhoto(req, res, sessionId, { imageBase64, nailBox, woundBox
       }
       return await postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox });
     }
-    return postFakePhoto(req, res, session, { confidenceMeta, hardFlags });
+    return await postFakePhoto(req, res, session, { confidenceMeta, hardFlags });
   } catch (err) {
     // Surfaces ml-service/Claude failures (service down, bad API key, network
     // error) as a clear JSON error instead of a hung request - this endpoint
@@ -216,9 +216,9 @@ async function postMobilePhoto(req, res) {
   return submitPhoto(req, res, sessionId, req.body);
 }
 
-function getSessionStatus(req, res) {
+async function getSessionStatus(req, res) {
   const { id } = req.params;
-  const session = store.getSession(id);
+  const session = await store.getSession(id);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
   res.json(session);
 }

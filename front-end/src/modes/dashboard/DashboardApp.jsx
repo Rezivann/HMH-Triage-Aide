@@ -12,7 +12,7 @@ import { fadeUp } from '../../shared/motion';
 
 export default function DashboardApp() {
   const { nurseId, isAuthenticated, login, error: authError } = useDashboardAuth();
-  const { queue, error: queueError, refetch } = useQueueSocket();
+  const { queue, error: queueError, refetch } = useQueueSocket(isAuthenticated);
   const [selected, setSelected] = useState(null);
   const [idInput, setIdInput] = useState('');
   const [showPolicy, setShowPolicy] = useState(false);

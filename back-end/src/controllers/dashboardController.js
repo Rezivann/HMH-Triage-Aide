@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const store = require('./fakeSessionStore');
+const store = require('../services/SessionStore');
 const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const { sortQueue } = require('../utils/queueSort');
 const { pinConflictCheck } = require('../utils/pinConflictCheck');
@@ -17,10 +17,11 @@ function devLogin(req, res) {
   res.json({ nurseToken, nurseId, siteAccess });
 }
 
-function listQueue(req, res) {
+async function listQueue(req, res) {
   const { siteAccess } = req.nurse;
 
-  const queued = store.listSessions({ locationIds: siteAccess }).filter((s) => s.rawScore !== null);
+  const sessions = await store.listSessions({ locationIds: siteAccess });
+  const queued = sessions.filter((s) => s.rawScore !== null);
   const ranked = sortQueue(queued, { now: new Date(), categoryDecay: acuityPolicyStore.getCategoryDecay() });
 
   res.json({ queue: ranked });
@@ -48,25 +49,26 @@ function updateAcuityPolicy(req, res) {
   res.json(updated);
 }
 
-function getSessionDetail(req, res) {
+async function getSessionDetail(req, res) {
   const { id } = req.params;
-  const session = store.getSession(id);
+  const session = await store.getSession(id);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
   res.json(session);
 }
 
-function claim(req, res) {
+async function claim(req, res) {
   const { id } = req.params;
   const { nurseId } = req.nurse;
-  const session = store.getSession(id);
+  const session = await store.getSession(id);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
-  // TODO: replace with ContactCenterService.queueToAgent() once services/ exists
-  const updated = store.updateSession(id, { claimedBy: nurseId });
+  // TODO: replace with ContactCenterService.queueToAgent() once a real Webex
+  // CC tenant is provisioned (see services/ContactCenterService.js).
+  const updated = await store.updateSession(id, { claimedBy: nurseId });
   res.json(updated);
 }
 
-function override(req, res) {
+async function override(req, res) {
   const { id } = req.params;
   const { overrideType, value, note } = req.body;
   const { nurseId } = req.nurse;
@@ -80,11 +82,12 @@ function override(req, res) {
     return res.status(400).json({ error: 'invalid_override_type' });
   }
 
-  const session = store.getSession(id);
+  const session = await store.getSession(id);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   if (overrideType === 'positionFloor') {
-    const { conflict, conflictingSessionId } = pinConflictCheck(store.listSessions(), {
+    const allSessions = await store.listSessions();
+    const { conflict, conflictingSessionId } = pinConflictCheck(allSessions, {
       sessionId: id,
       floorPosition: value,
     });
@@ -93,10 +96,13 @@ function override(req, res) {
     }
   }
 
+  // Append-only audit record (models/Override.js) - never overwrites a prior
+  // override, unlike updateSession's fields.
+  await store.createOverride(id, { overrideType, value: value ?? null, note, nurseId });
+
   // Any override - fixed score, position floor, or explicit dismiss - clears
   // auto-floor entirely and irreversibly for this patient.
-  const updated = store.updateSession(id, {
-    override: { type: overrideType, value: value ?? null, note, nurseId, at: new Date().toISOString() },
+  const updated = await store.updateSession(id, {
     autoFloor: { active: false, flooredAt: session.autoFloor?.flooredAt ?? null },
   });
 

@@ -1,6 +1,8 @@
-// Temporary in-memory stand-in for a persisted, nurse-editable clinical policy -
-// same "fake store" pattern as fakeSessionStore.js, replace with a real model
-// once models/ and a real database layer exist.
+// Temporary in-memory stand-in for a persisted, nurse-editable clinical policy.
+// Unlike per-session data (now real - see services/SessionStore.js), this is
+// global config with no per-patient identity, so there's no natural Mongoose
+// model for it yet - replace with a real one if/when policy history/audit
+// needs to survive a restart the way session data now does.
 //
 // Scale: 0-1000, where 1000 represents a patient at the brink of death. Three
 // knobs nurses control from the dashboard (dashboardController's

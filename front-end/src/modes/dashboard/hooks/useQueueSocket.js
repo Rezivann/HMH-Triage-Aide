@@ -7,7 +7,14 @@ import { dashboardRequest, NURSE_TOKEN_STORAGE_KEY, BASE_URL } from '../../../sh
 // status), and GET /dashboard/queue is already the authoritative computation
 // (effectiveScore is computed fresh on every read), so refetching is correct,
 // not a workaround.
-export function useQueueSocket() {
+// enabled: DashboardApp mounts this hook before the nurse has logged in (the
+// login form is rendered by the same component tree, not a separate route),
+// so without this the fetch+WS effect would fire once on mount with no
+// token, fail with a 401, and never retry - nothing re-triggers it once
+// isAuthenticated flips true afterward, since the effect has no dependency
+// on it. Pass isAuthenticated so the effect (re-)runs exactly when a real
+// token actually exists.
+export function useQueueSocket(enabled) {
   const [queue, setQueue] = useState([]);
   const [error, setError] = useState(null);
 
@@ -18,6 +25,8 @@ export function useQueueSocket() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
     refetch();
 
     const token = sessionStorage.getItem(NURSE_TOKEN_STORAGE_KEY);
@@ -31,7 +40,7 @@ export function useQueueSocket() {
     ws.onerror = () => setError(new Error('WebSocket connection failed'));
 
     return () => ws.close();
-  }, [refetch]);
+  }, [enabled, refetch]);
 
   return { queue, error, refetch };
 }
