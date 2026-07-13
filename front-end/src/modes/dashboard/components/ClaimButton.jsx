@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import MotionButton from '../../../shared/components/MotionButton';
 import { dashboardRequest } from '../../../shared/api/apiClient';
 
 export default function ClaimButton({ sessionId, claimedBy, onClaimed }) {
@@ -14,11 +16,21 @@ export default function ClaimButton({ sessionId, claimedBy, onClaimed }) {
     }
   }
 
-  if (claimedBy) return <p>Claimed by {claimedBy}</p>;
+  if (claimedBy)
+    return (
+      <motion.span
+        className="status-pill status-pill--success"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+      >
+        Claimed by {claimedBy}
+      </motion.span>
+    );
 
   return (
-    <button type="button" onClick={handleClaim} disabled={claiming}>
+    <MotionButton type="button" className="btn-primary" onClick={handleClaim} disabled={claiming}>
       {claiming ? 'Claiming...' : 'Claim'}
-    </button>
+    </MotionButton>
   );
 }

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAcuityPolicy } from '../hooks/useAcuityPolicy';
+import MotionButton from '../../../shared/components/MotionButton';
+import { fadeUp } from '../../../shared/motion';
 
 // Scale is 0-1000, 1000 = brink of death - mirrors back-end's
 // utils/queueSort.js clamp so the projection column below never shows a
@@ -33,7 +36,12 @@ export default function AcuityPolicyPanel() {
   }, [policy]);
 
   if (error) return <p role="alert">{error.message}</p>;
-  if (!draft) return <p>Loading acuity policy...</p>;
+  if (!draft)
+    return (
+      <div className="card">
+        <p>Loading acuity policy...</p>
+      </div>
+    );
 
   function updateCategory(key, field, value) {
     setDraft((prev) => ({
@@ -60,54 +68,68 @@ export default function AcuityPolicyPanel() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <motion.form
+      onSubmit={handleSubmit}
+      className="card"
+      variants={fadeUp}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+    >
       <h2>Acuity policy</h2>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Baseline score</th>
-            <th>Decay / min</th>
-            <th>Decay cap</th>
-            {PROJECTION_MINUTES.map((minutes) => (
-              <th key={minutes}>Score @ {minutes}min</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(draft.categories).map(([key, category]) => (
-            <tr key={key}>
-              <td>{category.label}</td>
-              <td>
-                <input
-                  type="number"
-                  value={category.baselineScore}
-                  onChange={(event) => updateCategory(key, 'baselineScore', event.target.value)}
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={category.decayWeightPerMinute}
-                  onChange={(event) => updateCategory(key, 'decayWeightPerMinute', event.target.value)}
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  value={category.decayCap}
-                  onChange={(event) => updateCategory(key, 'decayCap', event.target.value)}
-                />
-              </td>
+      <div style={{ overflowX: 'auto' }}>
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Baseline score</th>
+              <th>Decay / min</th>
+              <th>Decay cap</th>
               {PROJECTION_MINUTES.map((minutes) => (
-                <td key={minutes}>{Math.round(projectScore(category, minutes))}</td>
+                <th key={minutes}>Score @ {minutes}min</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {Object.entries(draft.categories).map(([key, category]) => (
+              <tr key={key}>
+                <td>{category.label}</td>
+                <td>
+                  <input
+                    type="number"
+                    value={category.baselineScore}
+                    onChange={(event) => updateCategory(key, 'baselineScore', event.target.value)}
+                    style={{ width: '5rem' }}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={category.decayWeightPerMinute}
+                    onChange={(event) => updateCategory(key, 'decayWeightPerMinute', event.target.value)}
+                    style={{ width: '5rem' }}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    value={category.decayCap}
+                    onChange={(event) => updateCategory(key, 'decayCap', event.target.value)}
+                    style={{ width: '5rem' }}
+                  />
+                </td>
+                {PROJECTION_MINUTES.map((minutes) => (
+                  <td key={minutes} className="tabular-nums">
+                    {Math.round(projectScore(category, minutes))}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <label>
         Claude adjustment range (+/-)
@@ -116,26 +138,29 @@ export default function AcuityPolicyPanel() {
           min="0"
           value={draft.adjustmentRange}
           onChange={(event) => setDraft((prev) => ({ ...prev, adjustmentRange: Number(event.target.value) }))}
+          style={{ width: '6rem' }}
         />
       </label>
 
-      <input
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="Reason for change (required)"
-        required
-      />
-
-      <button type="submit" disabled={submitting}>
-        Save policy
-      </button>
+      <div className="row">
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Reason for change (required)"
+          required
+          style={{ flex: 1, minWidth: '10rem' }}
+        />
+        <MotionButton type="submit" className="btn-primary" disabled={submitting}>
+          Save policy
+        </MotionButton>
+      </div>
 
       {submitError && <p role="alert">{submitError}</p>}
       {policy?.lastChanged && (
-        <p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
           Last changed by {policy.lastChanged.nurseId} - "{policy.lastChanged.note}"
         </p>
       )}
-    </form>
+    </motion.form>
   );
 }

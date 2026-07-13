@@ -28,6 +28,11 @@ module.exports = {
   // Tracker auth (trackAuth.js) - short-lived single-session scoped token
   trackTokenSecret: optional('TRACK_TOKEN_SECRET', 'dev-insecure-track-secret'),
 
+  // Photo auth (photoAuth.js) - short-lived single-session scoped token
+  // embedded in the kiosk's QR code, letting a patient's phone submit a
+  // photo without ever holding the kiosk device's own kioskApiKeySecret
+  photoTokenSecret: optional('PHOTO_TOKEN_SECRET', 'dev-insecure-photo-secret'),
+
   // LlmService - conversation + acuity synthesis (Anthropic Messages API)
   llmApiKey: optional('LLM_API_KEY', null),
   llmModel: optional('LLM_MODEL', 'claude-haiku-4-5'),

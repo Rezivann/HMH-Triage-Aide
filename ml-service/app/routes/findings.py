@@ -16,6 +16,7 @@ def findings(req: FindingsRequest):
         wound_box=req.woundBox.model_dump(),
         scale_factor_mm_per_pixel=req.scaleFactorMmPerPixel,
         wound_area_cm2=req.woundAreaCm2,
+        area_margin_percent=req.areaMarginPercent,
     )
 
     return FindingsResult(
@@ -24,6 +25,7 @@ def findings(req: FindingsRequest):
             bleeding=result["bleeding"],
             boneVisible=result["boneVisible"],
             deformity=result["deformity"],
+            stage=result["stage"],
             hardFlags=result["hardFlags"],
         ),
         confidenceMeta=ConfidenceMeta(

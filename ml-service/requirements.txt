@@ -4,16 +4,21 @@ pydantic
 python-dotenv
 httpx
 
-# Stage 1 - capture_validation.py blur check
-opencv-python-headless
+# Stage 1 - capture_validation.py blur check. opencv-python (not -headless) -
+# scripts/test_pipeline.py's --show-image needs cv2.imshow, which headless
+# builds deliberately strip out. This is a superset of headless, so nothing
+# in the actual FastAPI service loses anything by using it instead.
+opencv-python
 numpy
 Pillow
 
 # Stage 3 - vision_llm_client.py
 anthropic
 
-# Stage 2 - nail_segmentation.py / wound_segmentation.py (SAM via Replicate)
-replicate
+# Stage 2 - nail_segmentation.py / wound_segmentation.py (MedSAM via a Hugging
+# Face Inference Endpoint, see ml-service/medsam-hf-endpoint/) - uses httpx
+# above, no extra package needed. (replicate package no longer needed - the
+# earlier vanilla-SAM-via-Replicate path for the nail was retired.)
 
 # testing
 pytest

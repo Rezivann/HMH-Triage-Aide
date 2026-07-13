@@ -1,20 +1,64 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import MotionCard from '../../../shared/components/MotionCard';
+
 const COPY = {
   waiting: "You're in the queue. We'll let you know as your turn approaches.",
   next: "You're next.",
   with_nurse: 'A nurse is with you now.',
 };
 
+const PILL_VARIANT = {
+  waiting: 'status-pill--neutral',
+  next: 'status-pill--accent',
+  with_nurse: 'status-pill--success',
+};
+
 // Shows this patient's own queue position - never a score, findings, or any
 // other patient's data (the backend enforces that boundary too; see
 // trackController.js).
 export default function StatusBand({ status, position }) {
-  if (!status) return <p>Loading your status...</p>;
+  if (!status)
+    return (
+      <MotionCard>
+        <p>Loading your status...</p>
+      </MotionCard>
+    );
 
   return (
-    <div>
-      <p>{COPY[status] ?? 'Checking your status...'}</p>
-      {position != null && <p>Position in queue: {position}</p>}
-      <p>Your position may shift as other patients' medical urgency is assessed.</p>
-    </div>
+    <MotionCard>
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={status}
+          className={`status-pill ${PILL_VARIANT[status] ?? 'status-pill--neutral'}`}
+          style={{ fontSize: '1.1rem' }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.3 }}
+        >
+          {COPY[status] ?? 'Checking your status...'}
+        </motion.p>
+      </AnimatePresence>
+      {position != null && (
+        <p className="tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+          Position in queue:{' '}
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={position}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.25 }}
+              style={{ display: 'inline-block' }}
+            >
+              {position}
+            </motion.span>
+          </AnimatePresence>
+        </p>
+      )}
+      <p style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>
+        Your position may shift as other patients' medical urgency is assessed.
+      </p>
+    </MotionCard>
   );
 }

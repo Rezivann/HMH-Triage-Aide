@@ -78,6 +78,36 @@ const DEFAULT_POLICY = {
       decayWeightPerMinute: 2.08,
       decayCap: 250,
     },
+    // Internal/non-visible presentations (no photo taken) - severity is
+    // judged from the narrative alone, so these are coarser buckets than the
+    // wound-photo categories above. Cardiac-pattern chest pain can be fatal
+    // within minutes untreated - highest baseline and by far the fastest
+    // decay of any category, wound or not - ceiling 800+200=1000 over 10 min
+    // -> 200/10.
+    possible_cardiac: {
+      label: 'Chest pain / possible cardiac',
+      baselineScore: 800,
+      decayWeightPerMinute: 20,
+      decayCap: 200,
+    },
+    // Severe abdominal pain (e.g. suspected appendicitis/obstruction) -
+    // dangerous over hours, not minutes - ceiling 500+200=700 over 180 min
+    // (3h) -> 200/180.
+    severe_abdominal_pain: {
+      label: 'Severe abdominal pain',
+      baselineScore: 500,
+      decayWeightPerMinute: 1.11,
+      decayCap: 200,
+    },
+    // Mild internal symptoms (nausea, mild headache, etc.) with no red-flag
+    // features - similar risk profile to a minor laceration - ceiling
+    // 120+50=170 over 360 min (6h) -> 50/360.
+    mild_internal_symptom: {
+      label: 'Mild internal symptom',
+      baselineScore: 120,
+      decayWeightPerMinute: 0.14,
+      decayCap: 50,
+    },
   },
 };
 

@@ -10,6 +10,7 @@ router.use(kioskAuth, auditLog);
 router.post('/session', kioskController.createSession);
 router.post('/message', kioskController.postMessage);
 router.post('/photo', kioskController.postPhoto);
+router.post('/no-photo', kioskController.postNoPhoto);
 router.get('/session/:id', kioskController.getSessionStatus);
 
 module.exports = router;

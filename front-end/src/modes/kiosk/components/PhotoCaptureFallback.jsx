@@ -1,20 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import { checkPhotoQuality } from './QualityCheck';
 import NailBoxSelector from './NailBoxSelector';
+import WoundBoxSelector from './WoundBoxSelector';
+import MotionCard from '../../../shared/components/MotionCard';
+import MotionButton from '../../../shared/components/MotionButton';
 
 // On-kiosk camera fallback for patients without a phone. Captures a still
-// frame, runs the on-device quality check, then hands off to NailBoxSelector
-// so the patient can box the nail of the finger they're pointing at the
-// wound with (SAM's segmentation prompt) before anything is submitted.
-// Actual image upload to the CV pipeline isn't wired up yet - POST
-// /kiosk/photo doesn't accept image bytes until CvServiceClient and
-// ml-service exist for real (see back-end/src/services/CvServiceClient.js) -
-// nailBox is passed upward regardless so the wiring is ready once that lands.
+// frame, runs the on-device quality check, then hands off to two box-draw
+// steps before anything is submitted: NailBoxSelector (optional - scale
+// reference for measurement.py's precise path) then WoundBoxSelector
+// (mandatory - MedSAM's segmentation prompt, no fallback since MedSAM
+// can't run without one). The captured blob is base64-encoded before being
+// handed to onCaptured - matches ml-service's imageRef (a plain base64
+// string, no data: URL prefix) all the way through kioskController.postPhoto.
+const STEPS = { CAMERA: 'camera', NAIL_BOX: 'nailBox', WOUND_BOX: 'woundBox' };
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function PhotoCaptureFallback({ onCaptured }) {
   const videoRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(false);
   const [capturedBlob, setCapturedBlob] = useState(null);
+  const [step, setStep] = useState(STEPS.CAMERA);
+  const [nailBox, setNailBox] = useState(null);
 
   useEffect(() => {
     let stream;
@@ -49,26 +66,87 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     }
 
     setCapturedBlob(blob);
+    setStep(STEPS.NAIL_BOX);
   }
 
-  if (capturedBlob) {
+  // Same quality gate and step transition as a live capture - a photo picked
+  // from camera roll/files is just a pre-existing Blob (File extends Blob),
+  // so it flows through the rest of the component identically from here on.
+  async function handleFileSelected(event) {
+    const file = event.target.files[0];
+    event.target.value = ''; // allow re-selecting the same file after a retake
+    if (!file) return;
+
+    setChecking(true);
+    setError(null);
+
+    const quality = await checkPhotoQuality(file);
+    setChecking(false);
+
+    if (!quality.passed) {
+      setError('Photo quality check failed - please choose a different photo.');
+      return;
+    }
+
+    setCapturedBlob(file);
+    setStep(STEPS.NAIL_BOX);
+  }
+
+  function handleRetake() {
+    setCapturedBlob(null);
+    setNailBox(null);
+    setStep(STEPS.CAMERA);
+  }
+
+  if (capturedBlob && step === STEPS.NAIL_BOX) {
     return (
       <NailBoxSelector
         imageBlob={capturedBlob}
-        onRetake={() => setCapturedBlob(null)}
-        onConfirm={({ nailBox }) => onCaptured({ blob: capturedBlob, nailBox })}
-        onSkip={() => onCaptured({ blob: capturedBlob, nailBox: null })}
+        onRetake={handleRetake}
+        onConfirm={({ nailBox: box }) => {
+          setNailBox(box);
+          setStep(STEPS.WOUND_BOX);
+        }}
+        onSkip={() => {
+          setNailBox(null);
+          setStep(STEPS.WOUND_BOX);
+        }}
+      />
+    );
+  }
+
+  if (capturedBlob && step === STEPS.WOUND_BOX) {
+    return (
+      <WoundBoxSelector
+        imageBlob={capturedBlob}
+        onRetake={handleRetake}
+        onConfirm={async ({ woundBox }) => {
+          const imageBase64 = await blobToBase64(capturedBlob);
+          onCaptured({ imageBase64, nailBox, woundBox });
+        }}
       />
     );
   }
 
   return (
-    <div>
+    <MotionCard>
       {error && <p role="alert">{error}</p>}
       <video ref={videoRef} autoPlay playsInline muted />
-      <button type="button" onClick={handleCapture} disabled={checking}>
-        {checking ? 'Checking...' : 'Capture Photo'}
-      </button>
-    </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelected}
+        style={{ display: 'none' }}
+      />
+      <div className="row">
+        <MotionButton type="button" className="btn-primary" onClick={handleCapture} disabled={checking}>
+          {checking ? 'Checking...' : 'Capture Photo'}
+        </MotionButton>
+        <MotionButton type="button" onClick={() => fileInputRef.current?.click()} disabled={checking}>
+          Upload from camera roll / files
+        </MotionButton>
+      </div>
+    </MotionCard>
   );
 }

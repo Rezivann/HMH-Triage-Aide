@@ -44,4 +44,18 @@ function trackRequest(path, options = {}) {
   return request(path, options);
 }
 
-export { BASE_URL, NURSE_TOKEN_STORAGE_KEY, request, kioskRequest, dashboardRequest, trackRequest };
+// Photo token (MobileCaptureApp) also lives in the URL path itself, same as
+// the tracker token - no auth header, and never the kiosk device's own key.
+function mobileCaptureRequest(path, options = {}) {
+  return request(path, options);
+}
+
+export {
+  BASE_URL,
+  NURSE_TOKEN_STORAGE_KEY,
+  request,
+  kioskRequest,
+  dashboardRequest,
+  trackRequest,
+  mobileCaptureRequest,
+};

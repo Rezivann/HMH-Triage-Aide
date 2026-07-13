@@ -4,7 +4,15 @@
 export default function AutoFloorBadge({ autoFloor, floorEffective }) {
   if (!autoFloor?.active) return null;
   if (floorEffective === false) {
-    return <span title="Auto-floor zone was full">Cascade-below</span>;
+    return (
+      <span className="badge badge--warning" title="Auto-floor zone was full">
+        Cascade-below
+      </span>
+    );
   }
-  return <span title="Guaranteed top-10% slot">Auto-floored</span>;
+  return (
+    <span className="badge badge--accent badge--pulse" title="Guaranteed top-10% slot">
+      Auto-floored
+    </span>
+  );
 }

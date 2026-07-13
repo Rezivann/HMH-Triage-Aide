@@ -8,10 +8,12 @@ import { kioskRequest } from '../../../shared/api/apiClient';
 export function useKioskSession() {
   const [sessionId, setSessionId] = useState(null);
   const [trackToken, setTrackToken] = useState(null);
+  const [photoToken, setPhotoToken] = useState(null);
   const [status, setStatus] = useState('creating'); // creating | ready | error
   const [error, setError] = useState(null);
   const [messages, setMessages] = useState([]);
   const [photoResult, setPhotoResult] = useState(null);
+  const [intakeStatus, setIntakeStatus] = useState('asking'); // asking | ready_for_photo | ready_no_photo
 
   useEffect(() => {
     let cancelled = false;
@@ -20,6 +22,7 @@ export function useKioskSession() {
         if (cancelled) return;
         setSessionId(data.sessionId);
         setTrackToken(data.trackToken);
+        setPhotoToken(data.photoToken);
         setStatus('ready');
       })
       .catch((err) => {
@@ -39,6 +42,7 @@ export function useKioskSession() {
         body: { sessionId, message: text },
       });
       setMessages(data.messages);
+      setIntakeStatus(data.intakeStatus ?? 'asking');
       return data;
     },
     [sessionId]
@@ -56,5 +60,29 @@ export function useKioskSession() {
     [sessionId]
   );
 
-  return { sessionId, trackToken, status, error, messages, sendMessage, photoResult, submitPhoto };
+  // Intake decided this presentation has nothing visually inspectable (e.g.
+  // stomach pain) - skips photo capture entirely and synthesizes acuity from
+  // the conversation narrative alone (see kioskController.postNoPhoto).
+  const submitWithoutPhoto = useCallback(async () => {
+    const data = await kioskRequest('/kiosk/no-photo', {
+      method: 'POST',
+      body: { sessionId },
+    });
+    setPhotoResult(data);
+    return data;
+  }, [sessionId]);
+
+  return {
+    sessionId,
+    trackToken,
+    photoToken,
+    status,
+    error,
+    messages,
+    sendMessage,
+    photoResult,
+    submitPhoto,
+    submitWithoutPhoto,
+    intakeStatus,
+  };
 }

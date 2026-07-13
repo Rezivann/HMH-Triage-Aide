@@ -28,34 +28,51 @@ PORT = _optional_int("PORT", 8000)
 ANTHROPIC_API_KEY = _optional("ANTHROPIC_API_KEY", None)
 CLAUDE_MODEL = _optional("CLAUDE_MODEL", "claude-haiku-4-5")
 
-# Stage 2 measurement (SAM), hosted on Replicate. SAM_MODEL_VERSION is the
-# `owner/model:version` string from the specific SAM model page you pick on
-# Replicate (e.g. a segment-anything or segment-anything-2 model) - pin an
-# exact version hash, not just "owner/model", so a model update upstream
-# can't silently change segmentation behavior underneath this service.
-SAM_API_KEY = _optional("SAM_API_KEY", None)
-SAM_MODEL_VERSION = _optional("SAM_MODEL_VERSION", None)
+# Stage 2 segmentation - MedSAM (bowang-lab, Apache 2.0) handles BOTH the
+# nail (nail_segmentation.py) and the wound (wound_segmentation.py) now,
+# via the same Hugging Face Inference Endpoint running the custom handler in
+# ml-service/medsam-hf-endpoint/ (see its README). Originally nail
+# segmentation used vanilla SAM/FastSAM on Replicate on the theory that
+# MedSAM (tuned for medical imaging) would be off-distribution for an
+# ordinary RGB finger photo - switched to MedSAM for both after FastSAM's
+# Replicate integration proved unreliable (undocumented box_prompt format,
+# coordinate convention, output shape all had to be reverse-engineered)
+# while this same MedSAM endpoint worked correctly on the first real
+# end-to-end test. MedSAM's own training data includes real RGB
+# skin-surface photography (dermoscopy, endoscopy), not just radiological
+# modalities, so it's a smaller mismatch than "medical imaging" suggests -
+# still worth validating mask quality against real photos.
+#
+# Single generic prompt only (see wound_segmentation.py) - MedSAM has no
+# semantic notion of wound type, so prompting it per-type ("bruise",
+# "burn", ...) just produces false positives, it isn't a classifier.
+MEDSAM_ENDPOINT_URL = _optional("MEDSAM_ENDPOINT_URL", None)
+MEDSAM_API_KEY = _optional("MEDSAM_API_KEY", None)
 
-# Known average (non-thumb) adult fingernail width in mm, used as the
-# reference object for converting SAM's nail pixel-width into a mm-per-pixel
-# scale factor before it's applied to the wound mask. Only ever a finger -
-# the patient always points at the wound with one finger (never the thumb,
-# never a toe), so there's no nail-type/finger-identity to resolve here.
-# Still a rough population average across index/middle/ring/pinky - revisit
-# with the clinical team.
-NAIL_AVG_WIDTH_MM = _optional_float("NAIL_AVG_WIDTH_MM", 14.0)
+# Reference object for converting SAM's nail pixel-width into a mm-per-pixel
+# scale factor before it's applied to the wound mask. Index finger
+# specifically now (not "any non-thumb finger") - nail width varies most at
+# the extremes (thumb widest, pinky narrowest), so index is the more
+# consistent middle reference. 12mm +/- 2mm approximates the adult
+# population range (women ~8-12mm, men ~10-14mm at the index finger)
+# without needing the patient's sex/hand size - still an approximation,
+# revisit with the clinical team.
+NAIL_AVG_WIDTH_MM = _optional_float("NAIL_AVG_WIDTH_MM", 12.0)
+NAIL_WIDTH_MARGIN_MM = _optional_float("NAIL_WIDTH_MARGIN_MM", 2.0)
 
-# Used only when the patient couldn't point at the wound (no nailBox, so no
-# real reference object) - a rough population-average guess for mm-per-pixel
-# at a typical close-up wound-photo distance/zoom. Far less reliable than
-# the nail-derived scale factor, which is why FALLBACK_SCALE_CONFIDENCE is
-# set well below LOW_CONFIDENCE_THRESHOLD - this is meant to trip
-# ReviewRoutingService.shouldAutoFloor (back-end/src/services/
-# ReviewRoutingService.js) once wired in, not be trusted as a real
+# Used only when the patient couldn't place their finger next to the wound
+# (no nailBox, so no real reference object) - a rough population-average
+# guess for mm-per-pixel at a typical close-up wound-photo distance/zoom.
+# Far less reliable than the nail-derived scale factor, which is why
+# FALLBACK_SCALE_CONFIDENCE is set well below LOW_CONFIDENCE_THRESHOLD and
+# FALLBACK_AREA_MARGIN_PERCENT is much wider than the nail-derived margin -
+# this is meant to trip ReviewRoutingService.shouldAutoFloor (back-end/src/
+# services/ReviewRoutingService.js) once wired in, not be trusted as a real
 # measurement. Needs calibration against real sample photos, same caveat as
 # BLUR_THRESHOLD.
 FALLBACK_SCALE_MM_PER_PIXEL = _optional_float("FALLBACK_SCALE_MM_PER_PIXEL", 0.3)
 FALLBACK_SCALE_CONFIDENCE = _optional_float("FALLBACK_SCALE_CONFIDENCE", 0.3)
+FALLBACK_AREA_MARGIN_PERCENT = _optional_float("FALLBACK_AREA_MARGIN_PERCENT", 50.0)
 
 BLUR_THRESHOLD = _optional_float("BLUR_THRESHOLD", 125)
 

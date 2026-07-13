@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { dashboardRequest } from '../../../shared/api/apiClient';
 import ClaimButton from './ClaimButton';
 import OverrideModal from './OverrideModal';
+import MotionButton from '../../../shared/components/MotionButton';
+import { fadeUp } from '../../../shared/motion';
 
+// Mounted/unmounted by the parent (DashboardApp) wrapping this in
+// AnimatePresence based on `selected` - so this component's own exit
+// animation runs on close, rather than just disappearing.
 export default function CaseDetail({ sessionId, onClose, onChanged }) {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
-    if (!sessionId) {
-      setSession(null);
-      return;
-    }
     dashboardRequest(`/dashboard/session/${sessionId}`).then(setSession);
   }, [sessionId]);
 
-  if (!sessionId || !session) return null;
+  if (!session) return null;
 
   function refresh() {
     dashboardRequest(`/dashboard/session/${sessionId}`).then(setSession);
@@ -22,12 +24,16 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
   }
 
   return (
-    <div>
-      <button type="button" onClick={onClose}>
-        Close
-      </button>
-      <h2>{session.sessionId}</h2>
-      <p>Status: {session.status}</p>
+    <motion.div className="card" variants={fadeUp} initial="hidden" animate="visible" exit="hidden">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2 className="tabular-nums" style={{ margin: 0 }}>
+          {session.sessionId}
+        </h2>
+        <MotionButton type="button" onClick={onClose}>
+          Close
+        </MotionButton>
+      </div>
+      <p className="status-pill status-pill--neutral">Status: {session.status}</p>
       <ul>
         {session.messages.map((message, index) => (
           <li key={index}>
@@ -35,8 +41,10 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
           </li>
         ))}
       </ul>
-      <ClaimButton sessionId={sessionId} claimedBy={session.claimedBy} onClaimed={refresh} />
+      <div className="row">
+        <ClaimButton sessionId={sessionId} claimedBy={session.claimedBy} onClaimed={refresh} />
+      </div>
       <OverrideModal sessionId={sessionId} onOverridden={refresh} />
-    </div>
+    </motion.div>
   );
 }

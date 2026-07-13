@@ -7,10 +7,16 @@ from app.config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 
 FINDINGS_SYSTEM_PROMPT = (
     "You are assisting emergency triage. You are given a full photo of a patient's "
-    "wound plus a cropped close-up of the wound region itself, along with a "
-    "pixel-precise wound area already computed from image segmentation. Classify "
-    "the wound - use the given area as context, do not recompute or second-guess "
-    "it. Do not invent findings that were not visible in the image."
+    "wound plus a cropped close-up of the wound region itself, along with a wound "
+    "area estimate already computed from image segmentation and a scale-reference "
+    "assumption. That area is an APPROXIMATION with a stated error margin, not a "
+    "precise clinical measurement - treat it as context for scale and severity, do "
+    "not recompute or second-guess the number itself, and do not present it as more "
+    "precise than the given margin allows. Classify the wound type and, if a "
+    "standard staging scheme applies to this wound type (e.g. burn degree, pressure "
+    "ulcer stage), include your best assessment of that stage - leave it unset if no "
+    "standard staging scheme applies. Do not invent findings that were not visible "
+    "in the image."
 )
 
 # Padding around SAM's tight wound box before cropping - a zero-padding crop
@@ -29,11 +35,25 @@ FINDINGS_TOOL = {
             "bleeding": {"type": "boolean"},
             "boneVisible": {"type": "boolean"},
             "deformity": {"type": "boolean"},
+            "stage": {
+                "type": ["string", "null"],
+                "description": "Clinical staging assessment if a standard scheme applies to this wound "
+                "type (e.g. burn degree, pressure ulcer stage), otherwise null.",
+            },
             "hardFlags": {"type": "array", "items": {"type": "string"}},
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "rationale": {"type": "string"},
         },
-        "required": ["woundType", "bleeding", "boneVisible", "deformity", "hardFlags", "confidence", "rationale"],
+        "required": [
+            "woundType",
+            "bleeding",
+            "boneVisible",
+            "deformity",
+            "stage",
+            "hardFlags",
+            "confidence",
+            "rationale",
+        ],
     },
 }
 
@@ -67,7 +87,13 @@ def _image_block(image) -> dict:
 # back-end/src/services/LlmService.js's synthesizeAcuity, which is a
 # separate, text-only Claude call on the Node side and never sees the image
 # itself - this is the one place a photo actually reaches an LLM).
-def classify_findings(image, wound_box: dict, scale_factor_mm_per_pixel: float, wound_area_cm2: float) -> dict:
+def classify_findings(
+    image,
+    wound_box: dict,
+    scale_factor_mm_per_pixel: float,
+    wound_area_cm2: float,
+    area_margin_percent: float,
+) -> dict:
     if not ANTHROPIC_API_KEY:
         raise RuntimeError("vision_llm_client.classify_findings: ANTHROPIC_API_KEY not configured - set it in .env")
 
@@ -91,8 +117,9 @@ def classify_findings(image, wound_box: dict, scale_factor_mm_per_pixel: float, 
                     {
                         "type": "text",
                         "text": (
-                            f"Pixel-precise wound area (already measured via segmentation): "
-                            f"{wound_area_cm2:.2f} cm2, scale factor {scale_factor_mm_per_pixel:.4f} mm/pixel."
+                            f"Estimated wound area (from image segmentation, approximate - not a "
+                            f"precise clinical measurement): {wound_area_cm2:.2f} cm2 +/- "
+                            f"{area_margin_percent:.0f}%, scale factor {scale_factor_mm_per_pixel:.4f} mm/pixel."
                         ),
                     },
                 ],

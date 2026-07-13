@@ -3,21 +3,17 @@ import { motion } from 'framer-motion';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
 
-// Shown after capture, before the photo is submitted. The kiosk instructs
-// the patient to press their index finger flat against the skin, directly
-// next to the wound - not the thumb or any other finger, not a toe. Index
-// specifically: nail width varies most at the extremes (thumb widest, pinky
-// narrowest), so index is the more consistent reference. "Flat against the
-// skin, same plane as the wound" (not just pointing from a distance) is
-// what neutralizes perspective/parallax error - camera distance/angle
-// affects the nail and the wound proportionally the same way when they're
-// coplanar, so exact perpendicular framing isn't required, just "same
-// plane." SAM (ml-service's nail_segmentation.py) can't find "the nail" in
-// a photo on its own - it's a promptable segmenter, not a classifier - so
-// the patient draws the box that becomes SAM's prompt.
+// Shown after NailBoxSelector, before the photo is submitted. Mandatory -
+// no skip button, unlike the nail box - MedSAM (ml-service's
+// wound_segmentation.py) was fine-tuned exclusively on box prompts and
+// degrades to near-zero performance with a point or no prompt at all, so
+// there's no fallback path here the way there is for the nail's scale
+// factor. This box only tells MedSAM roughly where to look; the mask it
+// actually returns (and the resulting area/crop) comes from its own
+// segmentation, not from this box's exact edges.
 const MIN_BOX_SIZE = 20; // displayed pixels - rejects an accidental tap
 
-export default function NailBoxSelector({ imageBlob, onConfirm, onRetake, onSkip }) {
+export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
   const imgRef = useRef(null);
   const containerRef = useRef(null);
   const [imageUrl, setImageUrl] = useState(null);
@@ -61,15 +57,14 @@ export default function NailBoxSelector({ imageBlob, onConfirm, onRetake, onSkip
   function handleConfirm() {
     const img = imgRef.current;
 
-    // Displayed (CSS) pixels -> the image's actual pixel resolution. SAM
-    // needs the box in the same coordinate space as the full-resolution
-    // image bytes being uploaded, not whatever size it happens to render at
-    // on this particular kiosk screen.
+    // Displayed (CSS) pixels -> the image's actual pixel resolution, same
+    // conversion NailBoxSelector does - MedSAM needs the box in the same
+    // coordinate space as the full-resolution image bytes being uploaded.
     const scaleX = img.naturalWidth / img.clientWidth;
     const scaleY = img.naturalHeight / img.clientHeight;
 
     onConfirm({
-      nailBox: {
+      woundBox: {
         x: Math.round(box.x * scaleX),
         y: Math.round(box.y * scaleY),
         width: Math.round(box.width * scaleX),
@@ -80,11 +75,7 @@ export default function NailBoxSelector({ imageBlob, onConfirm, onRetake, onSkip
 
   return (
     <MotionCard>
-      <p>
-        Press your index finger flat against your skin, directly next to the wound (not your thumb, and not
-        floating above it - flat and touching, at the same distance from the camera as the wound itself), then
-        draw a box tightly around that fingernail only, not the surrounding skin.
-      </p>
+      <p>Now draw a box around the entire wound, with a little room around the edges.</p>
 
       <div
         ref={containerRef}
@@ -123,25 +114,9 @@ export default function NailBoxSelector({ imageBlob, onConfirm, onRetake, onSkip
           Retake photo
         </MotionButton>
         <MotionButton type="button" className="btn-primary" onClick={handleConfirm} disabled={!hasValidBox}>
-          Confirm nail selection
+          Confirm wound area
         </MotionButton>
       </div>
-
-      {/* Skips scale calibration entirely rather than blocking submission -
-          ml-service falls back to a rough population-average scale estimate
-          (config.py's FALLBACK_SCALE_MM_PER_PIXEL, wider error margin via
-          FALLBACK_AREA_MARGIN_PERCENT) and marks the resulting measurement
-          low-confidence, which routes this patient into the auto-floor
-          safety valve instead of trusting a fabricated number. */}
-      <p>
-        <MotionButton
-          type="button"
-          onClick={() => onSkip()}
-          style={{ border: 'none', color: 'var(--color-text-faint)' }}
-        >
-          I can't place my finger next to the wound
-        </MotionButton>
-      </p>
     </MotionCard>
   );
 }
