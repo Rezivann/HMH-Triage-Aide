@@ -7,10 +7,10 @@ const COPY = {
   with_nurse: 'A nurse is with you now.',
 };
 
-const PILL_VARIANT = {
-  waiting: 'status-pill--neutral',
-  next: 'status-pill--accent',
-  with_nurse: 'status-pill--success',
+const BANNER_VARIANT = {
+  waiting: 'status-banner--neutral',
+  next: 'status-banner--accent',
+  with_nurse: 'status-banner--success',
 };
 
 // Shows this patient's own queue position - never a score, findings, or any
@@ -29,8 +29,7 @@ export default function StatusBand({ status, position }) {
       <AnimatePresence mode="wait">
         <motion.p
           key={status}
-          className={`status-pill ${PILL_VARIANT[status] ?? 'status-pill--neutral'}`}
-          style={{ fontSize: '1.1rem' }}
+          className={`status-banner ${BANNER_VARIANT[status] ?? 'status-banner--neutral'}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}

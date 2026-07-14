@@ -34,11 +34,17 @@ export default function KioskApp() {
   // press "Submit", and even for typed intake there's nothing left to
   // confirm once the LLM itself has already said it's ready to proceed.
   // Guarded by the ref (not just intakeStatus) so a re-render never fires
-  // this a second time for the same conversation.
+  // this a second time for the same conversation. Waits 5s before actually
+  // leaving the conversation screen - without it, the assistant's final
+  // message appears and the screen moves on to the QR/all-set page in the
+  // same instant, too fast to actually read what it said.
   useEffect(() => {
     if (intakeStatus === 'ready_no_photo' && !autoSubmittedRef.current) {
       autoSubmittedRef.current = true;
-      handleSubmitWithoutPhoto();
+      const timer = setTimeout(() => {
+        handleSubmitWithoutPhoto();
+      }, 5000);
+      return () => clearTimeout(timer);
     }
   }, [intakeStatus]);
 

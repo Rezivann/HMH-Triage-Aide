@@ -37,7 +37,17 @@ export default function EndScreen({ sessionId, trackUrl }) {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            style={{ background: '#fff', padding: 20, borderRadius: 'var(--radius-md)', display: 'inline-block' }}
+            style={{
+              background: '#fff',
+              padding: 20,
+              borderRadius: 'var(--radius-md)',
+              display: 'inline-block',
+              // Bigger than .card's own between-children margin (space-3) -
+              // adjoining block margins collapse to the larger value, so
+              // this is what actually widens the gap below the QR code
+              // specifically, not just duplicating the existing spacing.
+              marginBottom: 'var(--space-5)',
+            }}
           >
             <QRCodeSVG value={trackUrl} size={220} />
           </motion.div>
