@@ -9,7 +9,25 @@ const { corsOrigin } = require('./config/env');
 
 const app = express();
 
-app.use(cors({ origin: corsOrigin }));
+// CORS_ORIGIN may be a comma-separated list (e.g. the stable production
+// domain + http://localhost:5173 for local dev) - a single fixed string
+// only ever allows one origin, which doesn't fit having both a real
+// deployment and local dev working at the same time. Each entry must be a
+// full origin (scheme + host, e.g. https://example.com) - a bare hostname
+// is invalid per the CORS spec and browsers will reject it outright.
+const allowedOrigins = corsOrigin.split(',').map((origin) => origin.trim());
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // No Origin header (curl, server-to-server calls, same-origin) - allow.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS: origin "${origin}" is not in CORS_ORIGIN`));
+    },
+  })
+);
 // Default 100kb is fine for every other route, but /kiosk/photo carries a
 // base64-encoded camera photo (which itself runs ~33% larger than the raw
 // JPEG) - a real kiosk/phone capture can be several MB before encoding.
