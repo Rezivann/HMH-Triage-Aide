@@ -6,12 +6,9 @@ import MotionButton from '../../../shared/components/MotionButton';
 // Shown right after capture, before the photo is submitted - the only
 // box-draw step now (no nail-box step; this pipeline no longer estimates
 // wound area in real-world units, so there's no scale reference to
-// capture). Mandatory, no skip button - MedSAM (ml-service's
-// wound_segmentation.py) was fine-tuned exclusively on box prompts and
-// degrades to near-zero performance with a point or no prompt at all. This
-// box only tells MedSAM roughly where to look; the mask it actually returns
-// (fed to Claude as a visual overlay - see vision_llm_client.py) comes from
-// its own segmentation, not from this box's exact edges.
+// capture). Mandatory, no skip button - there's no CV segmentation model to
+// find the wound on its own, so this box is the only spatial hint
+// vision_llm_client.py has for where to crop and what to tell Claude.
 const MIN_BOX_SIZE = 20; // displayed pixels - rejects an accidental tap
 
 export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
@@ -58,9 +55,9 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
   function handleConfirm() {
     const img = imgRef.current;
 
-    // Displayed (CSS) pixels -> the image's actual pixel resolution - MedSAM
-    // needs the box in the same coordinate space as the full-resolution
-    // image bytes being uploaded.
+    // Displayed (CSS) pixels -> the image's actual pixel resolution - the
+    // backend needs the box in the same coordinate space as the
+    // full-resolution image bytes being uploaded.
     const scaleX = img.naturalWidth / img.clientWidth;
     const scaleY = img.naturalHeight / img.clientHeight;
 

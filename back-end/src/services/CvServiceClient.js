@@ -1,11 +1,12 @@
 const { cvServiceUrl } = require('../config/env');
 
 // Thin HTTP client for ml-service (Python/FastAPI, GPU-backed, never runs
-// on-device). Wraps the 3-stage pipeline so kioskController never talks to
+// on-device). Wraps the 2-stage pipeline so kioskController never talks to
 // ml-service directly - swap FastAPI routes, or the whole CV backend, for
 // Cogniac later without touching the controller. Field shapes here match
-// ml-service/app/models/schemas.py exactly - see MeasurementRequest/
-// FindingsRequest there if either side ever needs updating.
+// ml-service/app/models/schemas.py exactly - see FindingsRequest there if
+// either side ever needs updating. No segmentation model in this pipeline -
+// woundBox is exactly the patient's own drawn box, passed straight through.
 class CvServiceClient {
   constructor({ baseUrl = cvServiceUrl } = {}) {
     this.baseUrl = baseUrl;
@@ -17,24 +18,10 @@ class CvServiceClient {
     return this._post('/capture/validate', { imageRef });
   }
 
-  // Stage 2 - MedSAM wound segmentation using woundBoxPrompt (mandatory -
-  // see front-end's WoundBoxSelector.jsx). No nail/scale step anymore - this
-  // pipeline no longer estimates wound area in real-world units at all; the
-  // segmentation mask is fed to Claude as a visual overlay instead (Stage 3).
-  async measure(imageRef, { woundBoxPrompt }) {
-    return this._post('/capture/measure', { imageRef, woundBoxPrompt });
-  }
-
-  // Stage 3 - Claude vision findings. Takes the whole Stage 2 result rather
-  // than individual fields so a schema change on either side only touches
-  // one call site.
-  async classifyFindings(imageRef, measurement) {
-    return this._post('/capture/findings', {
-      imageRef,
-      woundBox: measurement.woundBox,
-      boundaryCoords: measurement.boundaryCoords,
-      measurementConfidence: measurement.confidence,
-    });
+  // Stage 2 - Claude vision findings, using the patient's own drawn wound
+  // box (mandatory - see front-end's WoundBoxSelector.jsx) as a spatial hint.
+  async classifyFindings(imageRef, woundBox) {
+    return this._post('/capture/findings', { imageRef, woundBox });
   }
 
   async _post(path, body) {

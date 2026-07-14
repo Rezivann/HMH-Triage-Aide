@@ -7,8 +7,10 @@ class ImageRefRequest(BaseModel):
     imageRef: str
 
 
-# Generic pixel-space box - the patient's rough drawn prompt around the
-# wound, and separately (same shape) MedSAM's own segmented mask extent.
+# The patient's own rough box drawn around the wound (front-end's
+# WoundBoxSelector.jsx, a mandatory step) - a spatial hint for Claude, not a
+# precise measurement. There is no CV segmentation step anymore; the box is
+# passed straight through to vision_llm_client.py as-is.
 class PixelBox(BaseModel):
     x: int
     y: int
@@ -16,51 +18,17 @@ class PixelBox(BaseModel):
     height: int
 
 
-# Stage 2 - measurement.py. woundBoxPrompt is mandatory - front-end's
-# WoundBoxSelector.jsx has no skip button, because MedSAM was fine-tuned
-# exclusively on box prompts and fails outright without one.
-class MeasurementRequest(BaseModel):
-    imageRef: str
-    woundBoxPrompt: PixelBox
-
-
-# Stage 1 - capture_validation.py. Kept separate from MeasurementResult so a
-# blur-only reject never spends a SAM call - see CaptureValidationResult.valid
-# gating whether the kiosk even proceeds to /capture/measure.
 class CaptureValidationResult(BaseModel):
     valid: bool
     failReasons: List[str] = []
 
 
-# Stage 2 - measurement.py. Pure segmentation output, no area/measurement -
-# this pipeline no longer estimates wound size in real-world units at all
-# (see findings.py/vision_llm_client.py: the segmentation mask is instead
-# drawn directly onto the image Claude sees, and Claude reasons about
-# severity visually rather than from a computed number). woundBox/
-# boundaryCoords are MedSAM's own segmentation OUTPUT (not
-# MeasurementRequest.woundBoxPrompt, the patient's rough drawn box that
-# PROMPTED it - MedSAM's actual mask extent can differ from that box) -
-# carried forward so findings.py can crop to woundBox and overlay
-# boundaryCoords for Claude's close-up view.
-class MeasurementResult(BaseModel):
-    valid: bool
-    failReasons: List[str] = []
-    boundaryCoords: Optional[List[List[float]]] = None
-    woundBox: Optional[PixelBox] = None
-    confidence: Optional[float] = None
-
-
-# Stage 3 - findings.py. Carries measurement's output forward so
-# vision_llm_client.py can crop to woundBox and draw boundaryCoords as a
-# visual mask overlay for Claude, instead of injecting a computed area
-# number as text context. measurementConfidence is MeasurementResult.confidence
-# carried through so findings.py can assemble a complete ConfidenceMeta.cvConfidence
-# without re-deriving it.
+# Stage 2 - findings.py. woundBox is mandatory (WoundBoxSelector.jsx has no
+# skip button) - it's cropped-to for Claude's close-up view and passed as a
+# text hint alongside the full photo, never drawn onto the image itself.
 class FindingsRequest(BaseModel):
     imageRef: str
     woundBox: PixelBox
-    boundaryCoords: List[List[float]]
-    measurementConfidence: float
 
 
 # Mirrors ReviewRoutingService.HARD_FLAG_CATEGORIES on the Node side - keep
@@ -82,9 +50,10 @@ class Findings(BaseModel):
 
 
 # Field names/shape match kioskController.postPhoto's fakeCvResult.confidenceMeta
-# exactly, since this is what eventually replaces that hardcoded object.
+# exactly, since this is what eventually replaces that hardcoded object. No
+# cvConfidence - there's no CV model in this pipeline anymore, only Claude's
+# own confidence in its findings.
 class ConfidenceMeta(BaseModel):
-    cvConfidence: float
     llmConfidence: float
     captureQualityPassed: bool
     findingsAgreement: bool

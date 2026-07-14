@@ -2,7 +2,6 @@
 const REASON_LABELS = {
   capture_quality_failed: 'Photo failed capture-quality check',
   findings_disagreement: 'CV and LLM findings disagreed',
-  low_cv_confidence: 'Low CV confidence',
   low_llm_confidence: 'Low LLM confidence',
 };
 

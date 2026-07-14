@@ -6,12 +6,11 @@ import MotionButton from '../../../shared/components/MotionButton';
 
 // On-kiosk camera fallback for patients without a phone. Captures a still
 // frame, runs the on-device quality check, then hands off to WoundBoxSelector
-// (mandatory - MedSAM's segmentation prompt, no fallback since MedSAM can't
-// run without one). No nail-box step - this pipeline no longer estimates
-// wound area in real-world units at all, so there's no scale reference to
-// capture. The captured blob is base64-encoded before being handed to
-// onCaptured - matches ml-service's imageRef (a plain base64 string, no
-// data: URL prefix) all the way through kioskController.postPhoto.
+// (mandatory - there's no CV model to find the wound on its own, so this box
+// is Claude's only spatial hint). The captured blob is base64-encoded before
+// being handed to onCaptured - matches ml-service's imageRef (a plain
+// base64 string, no data: URL prefix) all the way through
+// kioskController.postPhoto.
 const STEPS = { CAMERA: 'camera', WOUND_BOX: 'woundBox' };
 
 function blobToBase64(blob) {

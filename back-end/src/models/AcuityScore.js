@@ -13,7 +13,6 @@ const acuityScoreSchema = new mongoose.Schema(
     decayCategory: { type: String, required: true },
     queuedAt: { type: Date, required: true },
     confidenceMeta: {
-      cvConfidence: { type: Number },
       llmConfidence: { type: Number },
       captureQualityPassed: { type: Boolean },
       findingsAgreement: { type: Boolean },
@@ -43,20 +42,19 @@ const acuityScoreSchema = new mongoose.Schema(
       stage: { type: String, default: null },
       hardFlags: { type: [String], default: [] },
     },
-    // MedSAM's own segmentation output (Stage 2) - woundBox is the mask's
-    // bounding box, boundaryCoords its polygon outline, both in the
-    // original photo's pixel coordinate space. Stored purely for the
-    // dashboard's optional mask-overlay toggle (drawn client-side as an SVG
-    // layer on top of the <img>, never baked into imageBase64 itself - same
-    // "never alter the actual photo pixels" principle vision_llm_client.py
-    // follows for Claude).
+    // The patient's own drawn box around the wound (WoundBoxSelector.jsx),
+    // in the original photo's pixel coordinate space - not a CV model's
+    // output, there is no segmentation step in this pipeline. Stored purely
+    // for the dashboard's optional box-outline toggle (drawn client-side as
+    // an SVG layer on top of the <img>, never baked into imageBase64 itself
+    // - same "never alter the actual photo pixels" principle
+    // vision_llm_client.py follows for Claude).
     woundBox: {
       x: { type: Number, default: null },
       y: { type: Number, default: null },
       width: { type: Number, default: null },
       height: { type: Number, default: null },
     },
-    boundaryCoords: { type: [[Number]], default: [] },
   },
   { timestamps: true }
 );

@@ -10,21 +10,15 @@ httpx
 # (libGL, then libxcb, then more after that) that a bare deploy container
 # doesn't have and has to be patched in one missing .so at a time - not worth
 # it when nothing here actually needs a window. headless has none of that.
-# scripts/test_pipeline.py's --show-image is the one thing that needs real
-# cv2.imshow - under headless the symbol still exists but raises a runtime
-# cv2.error the moment it's called, since no GUI backend is compiled in. See
-# that script's docstring for the one-time local swap needed to use that flag.
 opencv-python-headless
 numpy
 Pillow
 
-# Stage 3 - vision_llm_client.py
+# Stage 2 - vision_llm_client.py. httpx above is scripts/test_pipeline.py's
+# own HTTP client for calling this service, not used by any CV model - there
+# is no segmentation model in this pipeline, findings come straight from
+# Claude vision on the patient's own drawn wound box.
 anthropic
-
-# Stage 2 - nail_segmentation.py / wound_segmentation.py (MedSAM via a Hugging
-# Face Inference Endpoint, see ml-service/medsam-hf-endpoint/) - uses httpx
-# above, no extra package needed. (replicate package no longer needed - the
-# earlier vanilla-SAM-via-Replicate path for the nail was retired.)
 
 # testing
 pytest

@@ -1,12 +1,10 @@
 import base64
 
 import cv2
-import numpy as np
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import vision_llm_client
-from app.services.vision_llm_client import _simplify_boundary
 
 client = TestClient(app)
 
@@ -15,8 +13,6 @@ def _request_body(encode_image, flat_image, box, **overrides):
     body = {
         "imageRef": encode_image(flat_image),
         "woundBox": box(),
-        "boundaryCoords": [[10, 10], [60, 10], [60, 60], [10, 60]],
-        "measurementConfidence": 0.85,
     }
     body.update(overrides)
     return body
@@ -44,14 +40,14 @@ class TestFindingsRoute:
         assert body["woundType"] == "laceration"
         assert body["findings"]["bleeding"] is True
         assert body["findings"]["hardFlags"] == []
-        assert body["confidenceMeta"]["cvConfidence"] == 0.85
         assert body["confidenceMeta"]["llmConfidence"] == 0.75
         assert body["confidenceMeta"]["captureQualityPassed"] is True
         # Hardcoded placeholder until a second classifier exists to compare
         # against - see ConfidenceMeta.findingsAgreement in schemas.py.
         assert body["confidenceMeta"]["findingsAgreement"] is True
+        assert "cvConfidence" not in body["confidenceMeta"]
 
-    def test_passes_wound_box_and_boundary_coords_through_to_classifier(self, mocker, encode_image, flat_image, box):
+    def test_passes_wound_box_through_to_classifier(self, mocker, encode_image, flat_image, box):
         classify_mock = mocker.patch(
             "app.routes.findings.classify_findings",
             return_value={
@@ -65,15 +61,10 @@ class TestFindingsRoute:
             },
         )
 
-        boundary = [[5, 5], [95, 5], [95, 95], [5, 95]]
-        client.post(
-            "/capture/findings",
-            json=_request_body(encode_image, flat_image, box, boundaryCoords=boundary),
-        )
+        client.post("/capture/findings", json=_request_body(encode_image, flat_image, box))
 
         _, kwargs = classify_mock.call_args
         assert kwargs["wound_box"] == box()
-        assert kwargs["boundary_coords"] == boundary
 
     def test_hard_flag_category_is_surfaced(self, mocker, encode_image, flat_image, box):
         mocker.patch(
@@ -92,26 +83,6 @@ class TestFindingsRoute:
         response = client.post("/capture/findings", json=_request_body(encode_image, flat_image, box))
 
         assert response.json()["findings"]["hardFlags"] == ["gunshot"]
-
-
-class TestBoundarySimplification:
-    def test_reduces_a_dense_contour_to_a_compact_polygon(self):
-        # A near-circular contour with 100 points - simplified should have
-        # meaningfully fewer points while still tracing the same rough shape.
-        angles = np.linspace(0, 2 * np.pi, 100, endpoint=False)
-        dense_boundary = [[int(50 + 40 * np.cos(a)), int(50 + 40 * np.sin(a))] for a in angles]
-
-        simplified = _simplify_boundary(dense_boundary)
-
-        assert len(simplified) < len(dense_boundary)
-        assert len(simplified) >= 3  # still a valid polygon
-
-    def test_leaves_an_already_simple_rectangle_essentially_unchanged(self):
-        rectangle = [[10, 10], [90, 10], [90, 90], [10, 90]]
-
-        simplified = _simplify_boundary(rectangle)
-
-        assert len(simplified) == 4
 
 
 class TestClassifyFindingsSendsUnalteredImages:
@@ -153,9 +124,8 @@ class TestClassifyFindingsSendsUnalteredImages:
         monkeypatch.setattr(vision_llm_client.anthropic, "Anthropic", FakeAnthropic)
 
         wound_box = {"x": 10, "y": 10, "width": 50, "height": 50}
-        boundary = [[10, 10], [60, 10], [60, 60], [10, 60]]
 
-        vision_llm_client.classify_findings(flat_image, wound_box, boundary)
+        vision_llm_client.classify_findings(flat_image, wound_box)
 
         content = captured["messages"][0]["content"]
         image_blocks = [c for c in content if c["type"] == "image"]
@@ -166,7 +136,7 @@ class TestClassifyFindingsSendsUnalteredImages:
 
         assert full_photo_b64 == expected_b64
 
-    def test_boundary_and_wound_box_are_sent_as_text_not_drawn_on_the_image(self, monkeypatch, flat_image):
+    def test_wound_box_is_sent_as_text_not_drawn_on_the_image(self, monkeypatch, flat_image):
         monkeypatch.setattr(vision_llm_client, "ANTHROPIC_API_KEY", "test-key")
         captured = {}
 
@@ -198,15 +168,13 @@ class TestClassifyFindingsSendsUnalteredImages:
         monkeypatch.setattr(vision_llm_client.anthropic, "Anthropic", FakeAnthropic)
 
         wound_box = {"x": 10, "y": 10, "width": 50, "height": 50}
-        boundary = [[10, 10], [60, 10], [60, 60], [10, 60]]
 
-        vision_llm_client.classify_findings(flat_image, wound_box, boundary)
+        vision_llm_client.classify_findings(flat_image, wound_box)
 
         content = captured["messages"][0]["content"]
         text_blocks = [c["text"] for c in content if c["type"] == "text"]
         combined_text = " ".join(text_blocks)
 
-        assert "MedSAM" in combined_text
         assert str(wound_box["width"]) in combined_text
         # Exactly two images (full photo + crop) - no third "mask" image.
         assert len([c for c in content if c["type"] == "image"]) == 2

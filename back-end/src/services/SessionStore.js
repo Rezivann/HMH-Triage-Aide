@@ -12,11 +12,10 @@ const ReviewFlag = require('../models/ReviewFlag');
 // file for why they're split rather than one flat document.
 //
 // Only Session's own fields can be set through updateSession - rawScore/
-// queuedAt/decayCategory/autoFloor/imageBase64/woundType/findings/woundBox/
-// boundaryCoords route to AcuityScore automatically (see ACUITY_FIELDS
-// below), and override is intentionally NOT settable this way (see
-// createOverride) since it's an append-only audit log, not a field to
-// overwrite in place.
+// queuedAt/decayCategory/autoFloor/imageBase64/woundType/findings/woundBox
+// route to AcuityScore automatically (see ACUITY_FIELDS below), and override
+// is intentionally NOT settable this way (see createOverride) since it's an
+// append-only audit log, not a field to overwrite in place.
 const ACUITY_FIELDS = [
   'rawScore',
   'queuedAt',
@@ -26,7 +25,6 @@ const ACUITY_FIELDS = [
   'woundType',
   'findings',
   'woundBox',
-  'boundaryCoords',
 ];
 
 function toFlatSession(session, acuityScore, latestOverride) {
@@ -58,10 +56,10 @@ function toFlatSession(session, acuityScore, latestOverride) {
           at: latestOverride.createdAt,
         }
       : null,
-    // Wound photo + Stage 2/3 CV output (see models/AcuityScore.js) - null/
-    // empty for sessions with no photo (the no-photo path, or a session that
-    // hasn't reached the photo step yet). woundType doubles as the sentinel
-    // for "was a real findings result ever recorded" - Mongoose's
+    // Wound photo + Claude vision findings (see models/AcuityScore.js) -
+    // null/empty for sessions with no photo (the no-photo path, or a session
+    // that hasn't reached the photo step yet). woundType doubles as the
+    // sentinel for "was a real findings result ever recorded" - Mongoose's
     // subdocument defaults mean acuityScore.findings is never actually
     // undefined/null itself (it's an all-null object even when never set),
     // so checking it directly wouldn't distinguish "no photo" from "photo,
@@ -70,7 +68,6 @@ function toFlatSession(session, acuityScore, latestOverride) {
     woundType: acuityScore?.woundType ?? null,
     findings: acuityScore?.woundType != null ? acuityScore.findings : null,
     woundBox: acuityScore?.woundType != null ? acuityScore.woundBox : null,
-    boundaryCoords: acuityScore?.woundType != null ? acuityScore.boundaryCoords ?? [] : [],
   };
 }
 

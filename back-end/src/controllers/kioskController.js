@@ -52,24 +52,20 @@ async function postMessage(req, res) {
   }
 }
 
-// Real pipeline: Stage 1 (blur) -> Stage 2 (measurement) -> Stage 3 (Claude
-// findings) -> LlmService.synthesizeAcuity (category + adjustment) -> queue.
-// Requires imageBase64 + woundBox (mandatory, matches front-end's
-// WoundBoxSelector having no skip button) and a running ml-service with real
-// SAM/MedSAM/Anthropic credentials - see ml-service/scripts/test_pipeline.py
-// for the equivalent direct-to-ml-service test path.
+// Real pipeline: Stage 1 (blur) -> Stage 2 (Claude vision findings) ->
+// LlmService.synthesizeAcuity (category + adjustment) -> queue. Requires
+// imageBase64 + woundBox (mandatory, matches front-end's WoundBoxSelector
+// having no skip button) and a running ml-service with a real Anthropic key
+// - see ml-service/scripts/test_pipeline.py for the equivalent
+// direct-to-ml-service test path. No segmentation model in this pipeline -
+// woundBox is exactly what the patient drew, passed straight to Claude.
 async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
   const validation = await cvServiceClient.validateCapture(imageBase64);
   if (!validation.valid) {
     return res.status(422).json({ error: 'capture_invalid', failReasons: validation.failReasons });
   }
 
-  const measurement = await cvServiceClient.measure(imageBase64, { woundBoxPrompt: woundBox });
-  if (!measurement.valid) {
-    return res.status(422).json({ error: 'measurement_invalid', failReasons: measurement.failReasons });
-  }
-
-  const findings = await cvServiceClient.classifyFindings(imageBase64, measurement);
+  const findings = await cvServiceClient.classifyFindings(imageBase64, woundBox);
 
   // Persisted regardless of what happens next (force-escalated or queued
   // normally) - see models/AcuityScore.js. This is what lets the nurse
@@ -79,8 +75,7 @@ async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
     imageBase64,
     woundType: findings.woundType,
     findings: findings.findings,
-    woundBox: measurement.woundBox,
-    boundaryCoords: measurement.boundaryCoords,
+    woundBox,
   };
 
   if (forceEscalate(findings.findings)) {
@@ -118,7 +113,6 @@ async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
 // it, since testing the scoring/queue logic shouldn't require live CV/LLM calls.
 async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOverride, hardFlags }) {
   const confidenceMeta = {
-    cvConfidence: 0.82,
     llmConfidence: 0.78,
     captureQualityPassed: true,
     findingsAgreement: true,
@@ -132,9 +126,9 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
     confidenceMeta,
   };
 
-  // No real image/segmentation on this path (see the module comment above) -
-  // woundType/findings still persist so the dashboard has something to show
-  // while testing, but imageBase64/woundBox/boundaryCoords stay unset.
+  // No real image on this path (see the module comment above) - woundType/
+  // findings still persist so the dashboard has something to show while
+  // testing, but imageBase64/woundBox stay unset.
   const cvRecord = { woundType: fakeCvResult.woundType, findings: fakeCvResult.findings };
 
   if (forceEscalate(fakeCvResult.findings)) {
@@ -160,13 +154,8 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
 
 // No-photo path: intake (LlmService.sendMessage's "ready_no_photo" status)
 // determined this presentation is purely internal - nothing a camera could
-// usefully show - so this skips the entire CV pipeline (Stage 1-3) and
-// synthesizes acuity from the conversation narrative alone. cvConfidence is
-// null (not 0) - there being no CV pipeline here isn't itself a low-trust
-// signal the way a low score from a pipeline that DID run would be, so
-// evaluateAutoFloor's cvConfidence check (which only fires on an actual
-// number) correctly skips it; only llmConfidence's own threshold applies,
-// same as it would for any other submission.
+// usefully show - so this skips the entire CV pipeline and synthesizes
+// acuity from the conversation narrative alone.
 async function postNoPhoto(req, res) {
   const { sessionId } = req.body;
   const session = await store.getSession(sessionId);
@@ -181,7 +170,6 @@ async function postNoPhoto(req, res) {
     const acuity = await llmService.synthesizeAcuity(narrative, null);
 
     const confidenceMeta = {
-      cvConfidence: null,
       llmConfidence: acuity.confidence,
       captureQualityPassed: true,
       findingsAgreement: true,

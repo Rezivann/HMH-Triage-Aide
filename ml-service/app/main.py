@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 
-from app.routes import capture_validation, findings, measurement
+from app.routes import capture_validation, findings
 
 app = FastAPI(title="LLMTriage ml-service")
 
 app.include_router(capture_validation.router, prefix="/capture")
-app.include_router(measurement.router, prefix="/capture")
 app.include_router(findings.router, prefix="/capture")
 
 

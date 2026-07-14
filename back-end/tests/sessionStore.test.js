@@ -44,7 +44,6 @@ describe('createSession / getSession', () => {
     expect(created.woundType).toBeNull();
     expect(created.findings).toBeNull();
     expect(created.woundBox).toBeNull();
-    expect(created.boundaryCoords).toEqual([]);
   });
 
   it('returns null for a session id that does not exist', async () => {
@@ -81,7 +80,7 @@ describe('updateSession', () => {
       rawScore: 525,
       decayCategory: 'severe_abdominal_pain',
       queuedAt,
-      autoFloor: { active: true, flooredAt: queuedAt, reason: 'low_cv_confidence', confidence: 0.42 },
+      autoFloor: { active: true, flooredAt: queuedAt, reason: 'low_llm_confidence', confidence: 0.42 },
     });
 
     expect(updated.rawScore).toBe(525);
@@ -90,7 +89,7 @@ describe('updateSession', () => {
     expect(updated.autoFloor).toEqual({
       active: true,
       flooredAt: expect.anything(),
-      reason: 'low_cv_confidence',
+      reason: 'low_llm_confidence',
       confidence: 0.42,
     });
 
@@ -123,20 +122,12 @@ describe('updateSession', () => {
       woundType: 'laceration',
       findings: { bleeding: true, boneVisible: false, deformity: false, stage: null, hardFlags: [] },
       woundBox: { x: 10, y: 20, width: 30, height: 40 },
-      boundaryCoords: [
-        [10, 20],
-        [40, 60],
-      ],
     });
 
     expect(updated.imageBase64).toBe('fake-base64-bytes');
     expect(updated.woundType).toBe('laceration');
     expect(updated.findings).toEqual({ bleeding: true, boneVisible: false, deformity: false, stage: null, hardFlags: [] });
     expect(updated.woundBox).toEqual(expect.objectContaining({ x: 10, y: 20, width: 30, height: 40 }));
-    expect(updated.boundaryCoords).toEqual([
-      [10, 20],
-      [40, 60],
-    ]);
 
     const refetched = await store.getSession(created.sessionId);
     expect(refetched.imageBase64).toBe('fake-base64-bytes');
@@ -155,7 +146,6 @@ describe('updateSession', () => {
     expect(updated.woundType).toBeNull();
     expect(updated.findings).toBeNull();
     expect(updated.woundBox).toBeNull();
-    expect(updated.boundaryCoords).toEqual([]);
   });
 });
 

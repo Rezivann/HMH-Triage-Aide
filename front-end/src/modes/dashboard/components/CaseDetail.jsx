@@ -40,7 +40,7 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
         imageBase64={session.imageBase64}
         woundType={session.woundType}
         findings={session.findings}
-        boundaryCoords={session.boundaryCoords}
+        woundBox={session.woundBox}
       />
 
       <ul>

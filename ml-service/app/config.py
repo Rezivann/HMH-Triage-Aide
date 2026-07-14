@@ -28,19 +28,6 @@ PORT = _optional_int("PORT", 8000)
 ANTHROPIC_API_KEY = _optional("ANTHROPIC_API_KEY", None)
 CLAUDE_MODEL = _optional("CLAUDE_MODEL", "claude-haiku-4-5")
 
-# Stage 2 segmentation - MedSAM (bowang-lab, Apache 2.0), via a Hugging Face
-# Inference Endpoint running the custom handler in
-# ml-service/medsam-hf-endpoint/ (see its README). Wound-only now - there is
-# no nail segmentation/scale-factor step (removed; the pipeline no longer
-# estimates wound area in real-world units at all, see vision_llm_client.py's
-# mask-overlay approach instead) and no vanilla-SAM/Replicate path either.
-#
-# Single generic prompt only (see wound_segmentation.py) - MedSAM has no
-# semantic notion of wound type, so prompting it per-type ("bruise",
-# "burn", ...) just produces false positives, it isn't a classifier.
-MEDSAM_ENDPOINT_URL = _optional("MEDSAM_ENDPOINT_URL", None)
-MEDSAM_API_KEY = _optional("MEDSAM_API_KEY", None)
-
 BLUR_THRESHOLD = _optional_float("BLUR_THRESHOLD", 125)
 
 # Matches back-end/src/services/ReviewRoutingService.js's LOW_CONFIDENCE_THRESHOLD -
