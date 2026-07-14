@@ -16,6 +16,8 @@ function auditLog(req, res, next) {
       ? { type: 'track', id: req.track.sessionId }
       : req.photoSession
       ? { type: 'phone', id: req.photoSession.sessionId }
+      : req.voice
+      ? { type: 'voice', id: req.body?.sessionId ?? null }
       : { type: 'anonymous', id: null };
 
     console.log(

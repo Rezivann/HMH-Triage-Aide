@@ -8,10 +8,8 @@ from app.config import MEDSAM_API_KEY, MEDSAM_ENDPOINT_URL
 # Calls MedSAM (bowang-lab, https://github.com/bowang-lab/MedSAM) hosted on a
 # Hugging Face Inference Endpoint - see ml-service/medsam-hf-endpoint/ for the
 # custom handler that runs it, and its README for deploying MEDSAM_ENDPOINT_URL.
-# Same endpoint nail_segmentation.py now uses too - see config.py's
-# MEDSAM_ENDPOINT_URL comment. Deliberately MedSAM, not vanilla SAM - wound
-# tissue, especially periwound/inflamed skin, has low-contrast gradual
-# boundaries that base SAM
+# Deliberately MedSAM, not vanilla SAM - wound tissue, especially
+# periwound/inflamed skin, has low-contrast gradual boundaries that base SAM
 # (trained on natural images with crisp edges) tends to under- or
 # over-segment; MedSAM is fine-tuned specifically for this.
 #
@@ -30,13 +28,17 @@ from app.config import MEDSAM_API_KEY, MEDSAM_ENDPOINT_URL
 #
 # wound_box_prompt is the patient's own rough box around the wound (drawn in
 # front-end's WoundBoxSelector.jsx, a mandatory step - MedSAM was fine-tuned
-# exclusively on box prompts and fails outright with a point or no prompt,
-# so unlike the nail's scale factor there's no fallback path here). MedSAM's
-# actual returned mask can be tighter or looser than this box - the box only
-# tells it where to look, it isn't trusted as the final extent.
+# exclusively on box prompts and fails outright with a point or no prompt).
+# MedSAM's actual returned mask can be tighter or looser than this box - the
+# box only tells it where to look, it isn't trusted as the final extent.
+#
+# No area/scale conversion here (or anywhere in this pipeline) - the mask
+# itself (boundaryCoords) is fed to Claude as a visual overlay in
+# vision_llm_client.py instead of being converted into a real-world area
+# estimate. See schemas.py's MeasurementResult for the resulting shape.
 
 
-def measure_wound_area(image, wound_box_prompt: dict, scale_factor_mm_per_pixel: float) -> dict:
+def measure_wound_area(image, wound_box_prompt: dict) -> dict:
     if not MEDSAM_API_KEY or not MEDSAM_ENDPOINT_URL:
         raise NotImplementedError(
             "wound_segmentation.measure_wound_area: "
@@ -70,15 +72,9 @@ def measure_wound_area(image, wound_box_prompt: dict, scale_factor_mm_per_pixel:
     if not result["valid"]:
         return {"valid": False, "failReasons": result["failReasons"]}
 
-    area_px = result["areaPx"]
-    # px^2 -> mm^2 (scale factor is mm/pixel, squared for area) -> cm^2
-    area_cm2 = area_px * (scale_factor_mm_per_pixel**2) / 100
-
     return {
         "valid": True,
         "failReasons": [],
-        "areaCm2": area_cm2,
-        "areaPx": area_px,
         "boundaryCoords": result["boundaryCoords"],
         "boundingBox": result["boundingBox"],
         "confidence": result["confidence"],

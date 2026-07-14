@@ -1,0 +1,12 @@
+# requirements.txt deliberately installs opencv-python (the GUI build), not
+# opencv-python-headless, so scripts/test_pipeline.py --show-image can open a
+# real window locally for eyeballing segmentation quality. That script never
+# runs on Railway - only the FastAPI service does, and it never touches
+# anything GUI-related - but opencv-python's GUI build still commonly fails
+# to *import* on a minimal Linux container with "ImportError: libGL.so.1:
+# cannot open shared object file", because that shared library isn't present
+# by default. These packages provide it (and its usual companion,
+# libglib2.0-0) so `import cv2` succeeds without changing which opencv
+# package is installed - local dev keeps using the same GUI-capable build.
+[phases.setup]
+aptPkgs = ["libgl1", "libglib2.0-0"]

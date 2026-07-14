@@ -3,14 +3,15 @@ import { motion } from 'framer-motion';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
 
-// Shown after NailBoxSelector, before the photo is submitted. Mandatory -
-// no skip button, unlike the nail box - MedSAM (ml-service's
+// Shown right after capture, before the photo is submitted - the only
+// box-draw step now (no nail-box step; this pipeline no longer estimates
+// wound area in real-world units, so there's no scale reference to
+// capture). Mandatory, no skip button - MedSAM (ml-service's
 // wound_segmentation.py) was fine-tuned exclusively on box prompts and
-// degrades to near-zero performance with a point or no prompt at all, so
-// there's no fallback path here the way there is for the nail's scale
-// factor. This box only tells MedSAM roughly where to look; the mask it
-// actually returns (and the resulting area/crop) comes from its own
-// segmentation, not from this box's exact edges.
+// degrades to near-zero performance with a point or no prompt at all. This
+// box only tells MedSAM roughly where to look; the mask it actually returns
+// (fed to Claude as a visual overlay - see vision_llm_client.py) comes from
+// its own segmentation, not from this box's exact edges.
 const MIN_BOX_SIZE = 20; // displayed pixels - rejects an accidental tap
 
 export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
@@ -57,9 +58,9 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
   function handleConfirm() {
     const img = imgRef.current;
 
-    // Displayed (CSS) pixels -> the image's actual pixel resolution, same
-    // conversion NailBoxSelector does - MedSAM needs the box in the same
-    // coordinate space as the full-resolution image bytes being uploaded.
+    // Displayed (CSS) pixels -> the image's actual pixel resolution - MedSAM
+    // needs the box in the same coordinate space as the full-resolution
+    // image bytes being uploaded.
     const scaleX = img.naturalWidth / img.clientWidth;
     const scaleY = img.naturalHeight / img.clientHeight;
 
@@ -75,7 +76,7 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
 
   return (
     <MotionCard>
-      <p>Now draw a box around the entire wound, with a little room around the edges.</p>
+      <p>Draw a box around the entire wound, with a little room around the edges.</p>
 
       <div
         ref={containerRef}

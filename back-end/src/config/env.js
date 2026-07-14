@@ -46,6 +46,11 @@ module.exports = {
   webexCcClientSecret: optional('WEBEX_CC_CLIENT_SECRET', null),
   webexCcOrgId: optional('WEBEX_CC_ORG_ID', null),
 
+  // Voice auth (voiceAuth.js) - Cisco Webex AI Agent Studio's webhook.
+  // Placeholder shared-secret scheme until a real Agent Studio tenant exists
+  // and its actual webhook-signing contract is known - see voiceAuth.js.
+  webexVoiceWebhookSecret: optional('WEBEX_VOICE_WEBHOOK_SECRET', null),
+
   // Queue scoring (utils/queueSort.js) - effectiveScore = rawScore +
   // min(minutesWaited * rate, cap), both rate and cap looked up per category
   // from controllers/fakeAcuityPolicyStore.js (nurse-editable from the

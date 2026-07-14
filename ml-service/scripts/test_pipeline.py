@@ -1,19 +1,18 @@
 """Manual end-to-end test against a running `uvicorn app.main:app`.
 
 Usage:
-    python scripts/test_pipeline.py path/to/photo.jpg --wound-box X Y W H [--nail-box X Y W H] [--show-image]
+    python scripts/test_pipeline.py path/to/photo.jpg --wound-box X Y W H [--show-image]
 
 Box coordinates are in the image's actual pixel dimensions (not on-screen size) -
 open the photo in any image viewer (e.g. Windows Paint) and hover the corners of
 the region you want to box; most viewers show the cursor's pixel position in the
-status bar. --nail-box is optional, same as the kiosk's skip button - omit it to
-exercise the fallback low-confidence scale path instead of the real one.
+status bar.
 
---show-image opens two OpenCV windows (nail, wound) showing the box you sent MedSAM
-(blue), the bounding box MedSAM's mask actually landed on (red), and the mask's
-own outline (green) - lets you eyeball segmentation quality directly instead of
-just trusting the numbers. Requires opencv-python, not opencv-python-headless
-(see requirements.txt's comment on this).
+--show-image opens an OpenCV window showing the box you sent MedSAM (blue), the
+bounding box MedSAM's mask actually landed on (red), and the mask's own outline
+(green) - lets you eyeball segmentation quality directly instead of just trusting
+the numbers. Requires opencv-python, not opencv-python-headless (see
+requirements.txt's comment on this).
 """
 
 import argparse
@@ -59,10 +58,7 @@ def print_response(r):
 
 # Calls MedSAM directly (bypassing kioskController-equivalent plumbing) so
 # --show-image works independent of what /capture/measure's response shape
-# happens to expose - the production API deliberately doesn't return the
-# nail's own mask/box, only the scale factor derived from it (see
-# nail_segmentation.py), so this is the only way to see what MedSAM actually
-# found for the nail specifically.
+# happens to expose.
 def call_medsam(image_b64, box):
     if not MEDSAM_API_KEY or not MEDSAM_ENDPOINT_URL:
         print("(skipping visualization - MEDSAM_ENDPOINT_URL/MEDSAM_API_KEY not set in .env)")
@@ -117,9 +113,8 @@ def show_segmentation(image_path, prompt_box, medsam_result, window_title):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("image_path")
-    parser.add_argument("--nail-box", nargs=4, type=int, metavar=("X", "Y", "W", "H"))
     parser.add_argument("--wound-box", nargs=4, type=int, metavar=("X", "Y", "W", "H"), required=True)
-    parser.add_argument("--show-image", action="store_true", help="Open OpenCV windows visualizing segmentation")
+    parser.add_argument("--show-image", action="store_true", help="Open an OpenCV window visualizing segmentation")
     args = parser.parse_args()
 
     image_b64 = encode_image(args.image_path)
@@ -134,12 +129,11 @@ def main():
         sys.exit(1)
 
     print("\n=== Stage 2: /capture/measure ===")
-    nail_box = box_arg(*args.nail_box) if args.nail_box else None
     wound_box = box_arg(*args.wound_box)
 
     r = httpx.post(
         f"{BASE_URL}/capture/measure",
-        json={"imageRef": image_b64, "nailBox": nail_box, "woundBoxPrompt": wound_box},
+        json={"imageRef": image_b64, "woundBoxPrompt": wound_box},
         timeout=45,  # short on purpose - fail fast during debugging; bump back up once things actually work
     )
     print_response(r)
@@ -156,9 +150,7 @@ def main():
         json={
             "imageRef": image_b64,
             "woundBox": measurement["woundBox"],
-            "scaleFactorMmPerPixel": measurement["scaleFactorMmPerPixel"],
-            "woundAreaCm2": measurement["woundAreaCm2"],
-            "areaMarginPercent": measurement["areaMarginPercent"],
+            "boundaryCoords": measurement["boundaryCoords"],
             "measurementConfidence": measurement["confidence"],
         },
         timeout=45,  # short on purpose - fail fast during debugging; bump back up once things actually work
@@ -166,11 +158,7 @@ def main():
     print_response(r)
 
     if args.show_image:
-        print("\n=== Visualizing segmentation (press any key in an image window to close) ===")
-        if nail_box:
-            show_segmentation(args.image_path, nail_box, call_medsam(image_b64, nail_box), "Nail segmentation")
-        else:
-            print("(no --nail-box given - nothing to visualize for the nail)")
+        print("\n=== Visualizing segmentation (press any key in the image window to close) ===")
         show_segmentation(args.image_path, wound_box, call_medsam(image_b64, wound_box), "Wound segmentation")
         cv2.waitKey(0)
         cv2.destroyAllWindows()

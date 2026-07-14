@@ -7,8 +7,8 @@ class ImageRefRequest(BaseModel):
     imageRef: str
 
 
-# Generic pixel-space box, reused for both the patient-drawn nail prompt and
-# SAM's own wound segmentation output.
+# Generic pixel-space box - the patient's rough drawn prompt around the
+# wound, and separately (same shape) MedSAM's own segmented mask extent.
 class PixelBox(BaseModel):
     x: int
     y: int
@@ -16,30 +16,11 @@ class PixelBox(BaseModel):
     height: int
 
 
-# In image pixel coordinates (not on-screen/CSS pixels) - see front-end's
-# NailBoxSelector.jsx, which does the CSS-pixel -> image-pixel conversion
-# before ever sending this. This becomes vanilla SAM's segmentation prompt
-# box in nail_segmentation.py - SAM can't find "the nail" on its own. Always
-# the patient's index fingernail, pressed flat against the skin directly
-# next to the wound (same depth plane, to neutralize perspective/parallax
-# error) - never the thumb, never a toe, never a different finger, so
-# there's no nail-identity ambiguity to resolve.
-NailBox = PixelBox
-
-
-# Stage 2 - measurement.py. nailBox is optional - the kiosk's "I can't place
-# my finger next to the wound" button submits without one, and measurement.py
-# falls back to config.py's FALLBACK_SCALE_MM_PER_PIXEL (a rough guess, not a
-# real measurement) rather than blocking submission entirely. woundBoxPrompt
-# is NOT optional - front-end's WoundBoxSelector.jsx has no skip button,
-# because MedSAM (unlike the nail-scale fallback) has no fallback mode: it
-# was fine-tuned exclusively on box prompts and fails outright without one.
-# Don't confuse this with MeasurementResult.woundBox below - this is the
-# patient's rough drawn box (the PROMPT); that one is MedSAM's own segmented
-# mask extent (the OUTPUT), which may differ from what the patient drew.
+# Stage 2 - measurement.py. woundBoxPrompt is mandatory - front-end's
+# WoundBoxSelector.jsx has no skip button, because MedSAM was fine-tuned
+# exclusively on box prompts and fails outright without one.
 class MeasurementRequest(BaseModel):
     imageRef: str
-    nailBox: Optional[NailBox] = None
     woundBoxPrompt: PixelBox
 
 
@@ -51,47 +32,34 @@ class CaptureValidationResult(BaseModel):
     failReasons: List[str] = []
 
 
-# Stage 2 - measurement.py. valid/failReasons duplicated here (not just in
-# CaptureValidationResult) because MedSAM's own segmentation confidence is a
-# second, independent retake trigger - a photo can pass the blur check and
-# still fail here if MedSAM can't find a wound (or SAM can't find a nail).
-# woundBox/woundAreaPx/boundaryCoords are MedSAM's own wound segmentation
-# OUTPUT (not MeasurementRequest.woundBoxPrompt, the patient's rough drawn
-# box that PROMPTED it - MedSAM's actual mask extent can differ from that
-# box) - carried forward so findings.py can crop to woundBox for Claude's
-# close-up view. areaMarginPercent is the
-# error margin on woundAreaCm2 (derived from the nail-width assumption's own
-# margin, or FALLBACK_AREA_MARGIN_PERCENT when there's no nail reference at
-# all) - this is a measurement-uncertainty number, distinct from confidence
-# (which reflects segmentation/prompt confidence, not calibration error) -
-# both should be surfaced together rather than collapsed into one number.
+# Stage 2 - measurement.py. Pure segmentation output, no area/measurement -
+# this pipeline no longer estimates wound size in real-world units at all
+# (see findings.py/vision_llm_client.py: the segmentation mask is instead
+# drawn directly onto the image Claude sees, and Claude reasons about
+# severity visually rather than from a computed number). woundBox/
+# boundaryCoords are MedSAM's own segmentation OUTPUT (not
+# MeasurementRequest.woundBoxPrompt, the patient's rough drawn box that
+# PROMPTED it - MedSAM's actual mask extent can differ from that box) -
+# carried forward so findings.py can crop to woundBox and overlay
+# boundaryCoords for Claude's close-up view.
 class MeasurementResult(BaseModel):
     valid: bool
     failReasons: List[str] = []
-    scaleFactorMmPerPixel: Optional[float] = None
-    woundAreaCm2: Optional[float] = None
-    woundAreaPx: Optional[float] = None
-    areaMarginPercent: Optional[float] = None
     boundaryCoords: Optional[List[List[float]]] = None
     woundBox: Optional[PixelBox] = None
     confidence: Optional[float] = None
 
 
 # Stage 3 - findings.py. Carries measurement's output forward so
-# vision_llm_client.py can inject it as context in the Claude prompt and crop
-# to woundBox for a close-up view alongside the full photo. measurementConfidence
-# is MeasurementResult.confidence carried through so findings.py can assemble
-# a complete ConfidenceMeta.cvConfidence without re-deriving it. areaMarginPercent
-# is threaded through so Claude (and eventually the UI) reports "approx X cm2
-# (+/-Y%)" rather than a bare precise-looking number - boundaryCoords is NOT
-# threaded through, since raw polygon coordinates aren't useful to an LLM as
-# text; the cropped image already shows the boundary visually.
+# vision_llm_client.py can crop to woundBox and draw boundaryCoords as a
+# visual mask overlay for Claude, instead of injecting a computed area
+# number as text context. measurementConfidence is MeasurementResult.confidence
+# carried through so findings.py can assemble a complete ConfidenceMeta.cvConfidence
+# without re-deriving it.
 class FindingsRequest(BaseModel):
     imageRef: str
     woundBox: PixelBox
-    scaleFactorMmPerPixel: float
-    woundAreaCm2: float
-    areaMarginPercent: float
+    boundaryCoords: List[List[float]]
     measurementConfidence: float
 
 

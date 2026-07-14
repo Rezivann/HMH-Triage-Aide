@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskSession } from './hooks/useKioskSession';
 import ConversationView from './components/ConversationView';
@@ -27,6 +27,19 @@ export default function KioskApp() {
   } = useKioskSession();
   const [step, setStep] = useState(STEPS.CONVERSATION);
   const [usingFallback, setUsingFallback] = useState(false);
+  const autoSubmittedRef = useRef(false);
+
+  // No button, no waiting for a tap - a voice-only patient has no way to
+  // press "Submit", and even for typed intake there's nothing left to
+  // confirm once the LLM itself has already said it's ready to proceed.
+  // Guarded by the ref (not just intakeStatus) so a re-render never fires
+  // this a second time for the same conversation.
+  useEffect(() => {
+    if (intakeStatus === 'ready_no_photo' && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
+      handleSubmitWithoutPhoto();
+    }
+  }, [intakeStatus]);
 
   if (status === 'creating')
     return (
@@ -47,8 +60,8 @@ export default function KioskApp() {
     setStep(STEPS.END);
   }
 
-  async function handleFallbackCaptured({ imageBase64, nailBox, woundBox }) {
-    await submitPhoto({ imageBase64, nailBox, woundBox });
+  async function handleFallbackCaptured({ imageBase64, woundBox }) {
+    await submitPhoto({ imageBase64, woundBox });
     setStep(STEPS.END);
   }
 
@@ -72,7 +85,6 @@ export default function KioskApp() {
               messages={messages}
               onSend={sendMessage}
               onContinue={() => setStep(STEPS.PHOTO)}
-              onSubmitWithoutPhoto={handleSubmitWithoutPhoto}
               intakeStatus={intakeStatus}
             />
           </motion.div>

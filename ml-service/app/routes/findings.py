@@ -14,9 +14,7 @@ def findings(req: FindingsRequest):
     result = classify_findings(
         image,
         wound_box=req.woundBox.model_dump(),
-        scale_factor_mm_per_pixel=req.scaleFactorMmPerPixel,
-        wound_area_cm2=req.woundAreaCm2,
-        area_margin_percent=req.areaMarginPercent,
+        boundary_coords=req.boundaryCoords,
     )
 
     return FindingsResult(

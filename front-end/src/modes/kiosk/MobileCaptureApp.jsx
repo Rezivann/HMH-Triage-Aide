@@ -10,21 +10,21 @@ import { mobileCaptureRequest } from '../../shared/api/apiClient';
 // session creation - see kioskController.createSession, verified by
 // photoAuth.js) - it's the only credential this page ever has, deliberately
 // never the kiosk device's own long-lived x-kiosk-api-key. Reuses
-// PhotoCaptureFallback wholesale for the actual camera + nail/wound
-// box-selection flow - identical UI to the on-kiosk fallback path, just a
-// different submission target and no session step afterward (the kiosk
-// screen advances on its own once PhotoCaptureQR's polling sees this land).
+// PhotoCaptureFallback wholesale for the actual camera + wound box-selection
+// flow - identical UI to the on-kiosk fallback path, just a different
+// submission target and no session step afterward (the kiosk screen
+// advances on its own once PhotoCaptureQR's polling sees this land).
 export default function MobileCaptureApp() {
   const { photoToken } = useParams();
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
 
-  async function handleCaptured({ imageBase64, nailBox, woundBox }) {
+  async function handleCaptured({ imageBase64, woundBox }) {
     setError(null);
     try {
       await mobileCaptureRequest(`/mobile-capture/${photoToken}/photo`, {
         method: 'POST',
-        body: { imageBase64, nailBox, woundBox },
+        body: { imageBase64, woundBox },
       });
       setSubmitted(true);
     } catch (err) {

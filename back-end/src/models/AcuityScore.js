@@ -22,6 +22,35 @@ const acuityScoreSchema = new mongoose.Schema(
       active: { type: Boolean, default: false },
       flooredAt: { type: Date, default: null },
     },
+
+    // The captured wound photo + Stage 2/3 CV output, persisted so the nurse
+    // dashboard can show the image/findings later without ever re-running
+    // the pipeline (which would also spend more LLM tokens for no reason).
+    // All optional/null - the no-photo path (internal complaints) has none
+    // of this, and the fake-photo test path has findings but no real image.
+    imageBase64: { type: String, default: null },
+    woundType: { type: String, default: null },
+    findings: {
+      bleeding: { type: Boolean, default: null },
+      boneVisible: { type: Boolean, default: null },
+      deformity: { type: Boolean, default: null },
+      stage: { type: String, default: null },
+      hardFlags: { type: [String], default: [] },
+    },
+    // MedSAM's own segmentation output (Stage 2) - woundBox is the mask's
+    // bounding box, boundaryCoords its polygon outline, both in the
+    // original photo's pixel coordinate space. Stored purely for the
+    // dashboard's optional mask-overlay toggle (drawn client-side as an SVG
+    // layer on top of the <img>, never baked into imageBase64 itself - same
+    // "never alter the actual photo pixels" principle vision_llm_client.py
+    // follows for Claude).
+    woundBox: {
+      x: { type: Number, default: null },
+      y: { type: Number, default: null },
+      width: { type: Number, default: null },
+      height: { type: Number, default: null },
+    },
+    boundaryCoords: { type: [[Number]], default: [] },
   },
   { timestamps: true }
 );

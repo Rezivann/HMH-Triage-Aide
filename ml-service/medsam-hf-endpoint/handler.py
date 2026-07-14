@@ -76,27 +76,11 @@ class EndpointHandler:
         largest = max(contours, key=cv2.contourArea)
         x, y, w, h = cv2.boundingRect(largest)
 
-        # minAreaRect - the minimum-area rectangle rotated to actually hug the
-        # contour's own orientation, unlike boundingRect above which is locked
-        # to the image's x/y axes. Its two side lengths are the shape's true
-        # extents along its own principal axes regardless of in-frame
-        # rotation - nail_segmentation.py uses the larger of the two as the
-        # nail's real width (a fingernail's visible plate is wider side-to-side
-        # than it is long cuticle-to-tip), instead of boundingBox.width, which
-        # conflates width and length once the finger is tilted rather than
-        # perfectly horizontal/vertical in the photo. boundingBox itself is
-        # left as-is - wound_segmentation.py/vision_llm_client.py's crop logic
-        # needs an axis-aligned rect to slice out of the raster image, which a
-        # rotated rect can't give without a perspective warp.
-        (_, _), (rect_w, rect_h), _ = cv2.minAreaRect(largest)
-        rotated_width_px = max(rect_w, rect_h)
-
         return {
             "valid": True,
             "failReasons": [],
             "areaPx": int(mask.sum()),
             "boundingBox": {"x": int(x), "y": int(y), "width": int(w), "height": int(h)},
-            "rotatedWidthPx": float(rotated_width_px),
             "boundaryCoords": largest.reshape(-1, 2).tolist(),
             "confidence": confidence,
         }

@@ -17,11 +17,12 @@ class CvServiceClient {
     return this._post('/capture/validate', { imageRef });
   }
 
-  // Stage 2 - nail scale factor (if nailBox given, else a low-confidence
-  // fallback) + MedSAM wound segmentation using woundBoxPrompt (mandatory -
-  // see front-end's WoundBoxSelector.jsx).
-  async measure(imageRef, { nailBox, woundBoxPrompt }) {
-    return this._post('/capture/measure', { imageRef, nailBox: nailBox ?? null, woundBoxPrompt });
+  // Stage 2 - MedSAM wound segmentation using woundBoxPrompt (mandatory -
+  // see front-end's WoundBoxSelector.jsx). No nail/scale step anymore - this
+  // pipeline no longer estimates wound area in real-world units at all; the
+  // segmentation mask is fed to Claude as a visual overlay instead (Stage 3).
+  async measure(imageRef, { woundBoxPrompt }) {
+    return this._post('/capture/measure', { imageRef, woundBoxPrompt });
   }
 
   // Stage 3 - Claude vision findings. Takes the whole Stage 2 result rather
@@ -31,9 +32,7 @@ class CvServiceClient {
     return this._post('/capture/findings', {
       imageRef,
       woundBox: measurement.woundBox,
-      scaleFactorMmPerPixel: measurement.scaleFactorMmPerPixel,
-      woundAreaCm2: measurement.woundAreaCm2,
-      areaMarginPercent: measurement.areaMarginPercent,
+      boundaryCoords: measurement.boundaryCoords,
       measurementConfidence: measurement.confidence,
     });
   }

@@ -4,6 +4,7 @@ const kioskRoutes = require('./routes/kioskRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const trackRoutes = require('./routes/trackRoutes');
 const mobileCaptureRoutes = require('./routes/mobileCaptureRoutes');
+const voiceRoutes = require('./routes/voiceRoutes');
 const { corsOrigin } = require('./config/env');
 
 const app = express();
@@ -20,5 +21,6 @@ app.use('/kiosk', kioskRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/track', trackRoutes);
 app.use('/mobile-capture', mobileCaptureRoutes);
+app.use('/voice', voiceRoutes);
 
 module.exports = app;

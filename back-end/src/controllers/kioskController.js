@@ -50,22 +50,34 @@ async function postMessage(req, res) {
 // WoundBoxSelector having no skip button) and a running ml-service with real
 // SAM/MedSAM/Anthropic credentials - see ml-service/scripts/test_pipeline.py
 // for the equivalent direct-to-ml-service test path.
-async function postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox }) {
+async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
   const validation = await cvServiceClient.validateCapture(imageBase64);
   if (!validation.valid) {
     return res.status(422).json({ error: 'capture_invalid', failReasons: validation.failReasons });
   }
 
-  const measurement = await cvServiceClient.measure(imageBase64, { nailBox, woundBoxPrompt: woundBox });
+  const measurement = await cvServiceClient.measure(imageBase64, { woundBoxPrompt: woundBox });
   if (!measurement.valid) {
     return res.status(422).json({ error: 'measurement_invalid', failReasons: measurement.failReasons });
   }
 
   const findings = await cvServiceClient.classifyFindings(imageBase64, measurement);
 
+  // Persisted regardless of what happens next (force-escalated or queued
+  // normally) - see models/AcuityScore.js. This is what lets the nurse
+  // dashboard show the photo/findings later without ever re-running the
+  // pipeline (or spending more LLM tokens to do so).
+  const cvRecord = {
+    imageBase64,
+    woundType: findings.woundType,
+    findings: findings.findings,
+    woundBox: measurement.woundBox,
+    boundaryCoords: measurement.boundaryCoords,
+  };
+
   if (forceEscalate(findings.findings)) {
     return res.status(202).json({
-      session: await store.updateSession(session.sessionId, { status: 'force_escalated' }),
+      session: await store.updateSession(session.sessionId, { status: 'force_escalated', ...cvRecord }),
       cv: findings,
       escalated: true,
     });
@@ -88,6 +100,7 @@ async function postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox
     autoFloor: shouldAutoFloor(findings.confidenceMeta)
       ? { active: true, flooredAt: new Date().toISOString() }
       : null,
+    ...cvRecord,
   });
 
   res.json({ session: updated, cv: findings, acuity });
@@ -113,9 +126,14 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
     confidenceMeta,
   };
 
+  // No real image/segmentation on this path (see the module comment above) -
+  // woundType/findings still persist so the dashboard has something to show
+  // while testing, but imageBase64/woundBox/boundaryCoords stay unset.
+  const cvRecord = { woundType: fakeCvResult.woundType, findings: fakeCvResult.findings };
+
   if (forceEscalate(fakeCvResult.findings)) {
     return res.status(202).json({
-      session: await store.updateSession(session.sessionId, { status: 'force_escalated' }),
+      session: await store.updateSession(session.sessionId, { status: 'force_escalated', ...cvRecord }),
       cv: fakeCvResult,
       escalated: true,
     });
@@ -130,6 +148,7 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
     autoFloor: shouldAutoFloor(confidenceMeta)
       ? { active: true, flooredAt: new Date().toISOString() }
       : null,
+    ...cvRecord,
   });
 
   res.json({ session: updated, cv: fakeCvResult });
@@ -181,7 +200,7 @@ async function postNoPhoto(req, res) {
 // Shared by both photo-submission routes below - the only difference between
 // them is how sessionId is authorized (kiosk device key + body field, vs. a
 // session-scoped photo token in the URL), never the pipeline itself.
-async function submitPhoto(req, res, sessionId, { imageBase64, nailBox, woundBox, confidenceMeta, hardFlags }) {
+async function submitPhoto(req, res, sessionId, { imageBase64, woundBox, confidenceMeta, hardFlags }) {
   const session = await store.getSession(sessionId);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
@@ -190,7 +209,7 @@ async function submitPhoto(req, res, sessionId, { imageBase64, nailBox, woundBox
       if (!woundBox) {
         return res.status(400).json({ error: 'woundBox_required_with_imageBase64' });
       }
-      return await postRealPhoto(req, res, session, { imageBase64, nailBox, woundBox });
+      return await postRealPhoto(req, res, session, { imageBase64, woundBox });
     }
     return await postFakePhoto(req, res, session, { confidenceMeta, hardFlags });
   } catch (err) {

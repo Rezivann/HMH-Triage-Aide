@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { checkPhotoQuality } from './QualityCheck';
-import NailBoxSelector from './NailBoxSelector';
 import WoundBoxSelector from './WoundBoxSelector';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
 
 // On-kiosk camera fallback for patients without a phone. Captures a still
-// frame, runs the on-device quality check, then hands off to two box-draw
-// steps before anything is submitted: NailBoxSelector (optional - scale
-// reference for measurement.py's precise path) then WoundBoxSelector
-// (mandatory - MedSAM's segmentation prompt, no fallback since MedSAM
-// can't run without one). The captured blob is base64-encoded before being
-// handed to onCaptured - matches ml-service's imageRef (a plain base64
-// string, no data: URL prefix) all the way through kioskController.postPhoto.
-const STEPS = { CAMERA: 'camera', NAIL_BOX: 'nailBox', WOUND_BOX: 'woundBox' };
+// frame, runs the on-device quality check, then hands off to WoundBoxSelector
+// (mandatory - MedSAM's segmentation prompt, no fallback since MedSAM can't
+// run without one). No nail-box step - this pipeline no longer estimates
+// wound area in real-world units at all, so there's no scale reference to
+// capture. The captured blob is base64-encoded before being handed to
+// onCaptured - matches ml-service's imageRef (a plain base64 string, no
+// data: URL prefix) all the way through kioskController.postPhoto.
+const STEPS = { CAMERA: 'camera', WOUND_BOX: 'woundBox' };
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -31,7 +30,6 @@ export default function PhotoCaptureFallback({ onCaptured }) {
   const [checking, setChecking] = useState(false);
   const [capturedBlob, setCapturedBlob] = useState(null);
   const [step, setStep] = useState(STEPS.CAMERA);
-  const [nailBox, setNailBox] = useState(null);
 
   useEffect(() => {
     let stream;
@@ -66,7 +64,7 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     }
 
     setCapturedBlob(blob);
-    setStep(STEPS.NAIL_BOX);
+    setStep(STEPS.WOUND_BOX);
   }
 
   // Same quality gate and step transition as a live capture - a photo picked
@@ -89,30 +87,12 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     }
 
     setCapturedBlob(file);
-    setStep(STEPS.NAIL_BOX);
+    setStep(STEPS.WOUND_BOX);
   }
 
   function handleRetake() {
     setCapturedBlob(null);
-    setNailBox(null);
     setStep(STEPS.CAMERA);
-  }
-
-  if (capturedBlob && step === STEPS.NAIL_BOX) {
-    return (
-      <NailBoxSelector
-        imageBlob={capturedBlob}
-        onRetake={handleRetake}
-        onConfirm={({ nailBox: box }) => {
-          setNailBox(box);
-          setStep(STEPS.WOUND_BOX);
-        }}
-        onSkip={() => {
-          setNailBox(null);
-          setStep(STEPS.WOUND_BOX);
-        }}
-      />
-    );
   }
 
   if (capturedBlob && step === STEPS.WOUND_BOX) {
@@ -122,7 +102,7 @@ export default function PhotoCaptureFallback({ onCaptured }) {
         onRetake={handleRetake}
         onConfirm={async ({ woundBox }) => {
           const imageBase64 = await blobToBase64(capturedBlob);
-          onCaptured({ imageBase64, nailBox, woundBox });
+          onCaptured({ imageBase64, woundBox });
         }}
       />
     );

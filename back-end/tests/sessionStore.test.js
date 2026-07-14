@@ -40,6 +40,11 @@ describe('createSession / getSession', () => {
     expect(created.decayCategory).toBeNull();
     expect(created.autoFloor).toBeNull();
     expect(created.override).toBeNull();
+    expect(created.imageBase64).toBeNull();
+    expect(created.woundType).toBeNull();
+    expect(created.findings).toBeNull();
+    expect(created.woundBox).toBeNull();
+    expect(created.boundaryCoords).toEqual([]);
   });
 
   it('returns null for a session id that does not exist', async () => {
@@ -100,6 +105,52 @@ describe('updateSession', () => {
     });
 
     expect(updated.autoFloor).toBeNull();
+  });
+
+  it('persists the wound photo and findings, and flattens them back out', async () => {
+    const created = await store.createSession({ kioskId: 'kiosk-1', locationId: 'loc-1' });
+
+    const updated = await store.updateSession(created.sessionId, {
+      rawScore: 165,
+      decayCategory: 'laceration_minor',
+      queuedAt: new Date().toISOString(),
+      imageBase64: 'fake-base64-bytes',
+      woundType: 'laceration',
+      findings: { bleeding: true, boneVisible: false, deformity: false, stage: null, hardFlags: [] },
+      woundBox: { x: 10, y: 20, width: 30, height: 40 },
+      boundaryCoords: [
+        [10, 20],
+        [40, 60],
+      ],
+    });
+
+    expect(updated.imageBase64).toBe('fake-base64-bytes');
+    expect(updated.woundType).toBe('laceration');
+    expect(updated.findings).toEqual({ bleeding: true, boneVisible: false, deformity: false, stage: null, hardFlags: [] });
+    expect(updated.woundBox).toEqual(expect.objectContaining({ x: 10, y: 20, width: 30, height: 40 }));
+    expect(updated.boundaryCoords).toEqual([
+      [10, 20],
+      [40, 60],
+    ]);
+
+    const refetched = await store.getSession(created.sessionId);
+    expect(refetched.imageBase64).toBe('fake-base64-bytes');
+  });
+
+  it('keeps findings/woundBox null when a session has a score but no photo (the no-photo path)', async () => {
+    const created = await store.createSession({ kioskId: 'kiosk-1', locationId: 'loc-1' });
+
+    const updated = await store.updateSession(created.sessionId, {
+      rawScore: 250,
+      decayCategory: 'mild_internal_symptom',
+      queuedAt: new Date().toISOString(),
+    });
+
+    expect(updated.imageBase64).toBeNull();
+    expect(updated.woundType).toBeNull();
+    expect(updated.findings).toBeNull();
+    expect(updated.woundBox).toBeNull();
+    expect(updated.boundaryCoords).toEqual([]);
   });
 });
 

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { dashboardRequest } from '../../../shared/api/apiClient';
 import ClaimButton from './ClaimButton';
 import OverrideModal from './OverrideModal';
+import WoundPhotoPanel from './WoundPhotoPanel';
 import MotionButton from '../../../shared/components/MotionButton';
 import { fadeUp } from '../../../shared/motion';
 
@@ -34,6 +35,14 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
         </MotionButton>
       </div>
       <p className="status-pill status-pill--neutral">Status: {session.status}</p>
+
+      <WoundPhotoPanel
+        imageBase64={session.imageBase64}
+        woundType={session.woundType}
+        findings={session.findings}
+        boundaryCoords={session.boundaryCoords}
+      />
+
       <ul>
         {session.messages.map((message, index) => (
           <li key={index}>
