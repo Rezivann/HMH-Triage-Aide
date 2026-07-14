@@ -41,7 +41,14 @@ function toFlatSession(session, acuityScore, latestOverride) {
     rawScore: acuityScore?.rawScore ?? null,
     queuedAt: acuityScore?.queuedAt ?? null,
     decayCategory: acuityScore?.decayCategory ?? null,
-    autoFloor: acuityScore?.autoFloor?.active ? { active: true, flooredAt: acuityScore.autoFloor.flooredAt } : null,
+    autoFloor: acuityScore?.autoFloor?.active
+      ? {
+          active: true,
+          flooredAt: acuityScore.autoFloor.flooredAt,
+          reason: acuityScore.autoFloor.reason,
+          confidence: acuityScore.autoFloor.confidence,
+        }
+      : null,
     override: latestOverride
       ? {
           type: latestOverride.overrideType,

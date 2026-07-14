@@ -101,9 +101,16 @@ async function override(req, res) {
   await store.createOverride(id, { overrideType, value: value ?? null, note, nurseId });
 
   // Any override - fixed score, position floor, or explicit dismiss - clears
-  // auto-floor entirely and irreversibly for this patient.
+  // auto-floor entirely and irreversibly for this patient. flooredAt/reason/
+  // confidence are kept (not nulled) so the case history still shows why it
+  // was floored before the nurse overrode it.
   const updated = await store.updateSession(id, {
-    autoFloor: { active: false, flooredAt: session.autoFloor?.flooredAt ?? null },
+    autoFloor: {
+      active: false,
+      flooredAt: session.autoFloor?.flooredAt ?? null,
+      reason: session.autoFloor?.reason ?? null,
+      confidence: session.autoFloor?.confidence ?? null,
+    },
   });
 
   res.json(updated);

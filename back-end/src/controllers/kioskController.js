@@ -3,7 +3,13 @@ const store = require('../services/SessionStore');
 const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const CvServiceClient = require('../services/CvServiceClient');
 const LlmService = require('../services/LlmService');
-const { forceEscalate, shouldAutoFloor } = require('../services/ReviewRoutingService');
+const { forceEscalate, evaluateAutoFloor } = require('../services/ReviewRoutingService');
+
+function buildAutoFloor(confidenceMeta) {
+  const result = evaluateAutoFloor(confidenceMeta);
+  if (!result) return null;
+  return { active: true, flooredAt: new Date().toISOString(), reason: result.reason, confidence: result.confidence };
+}
 const { trackTokenSecret, photoTokenSecret } = require('../config/env');
 
 const cvServiceClient = new CvServiceClient();
@@ -97,9 +103,7 @@ async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
     rawScore: acuity.rawScore,
     decayCategory: acuity.category,
     queuedAt: new Date().toISOString(),
-    autoFloor: shouldAutoFloor(findings.confidenceMeta)
-      ? { active: true, flooredAt: new Date().toISOString() }
-      : null,
+    autoFloor: buildAutoFloor(findings.confidenceMeta),
     ...cvRecord,
   });
 
@@ -145,9 +149,7 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
     rawScore: acuityPolicyStore.getCategory(decayCategory).baselineScore,
     decayCategory,
     queuedAt: new Date().toISOString(),
-    autoFloor: shouldAutoFloor(confidenceMeta)
-      ? { active: true, flooredAt: new Date().toISOString() }
-      : null,
+    autoFloor: buildAutoFloor(confidenceMeta),
     ...cvRecord,
   });
 
@@ -160,7 +162,7 @@ async function postFakePhoto(req, res, session, { confidenceMeta: confidenceOver
 // synthesizes acuity from the conversation narrative alone. cvConfidence is
 // null (not 0) - there being no CV pipeline here isn't itself a low-trust
 // signal the way a low score from a pipeline that DID run would be, so
-// shouldAutoFloor's cvConfidence check (which only fires on an actual
+// evaluateAutoFloor's cvConfidence check (which only fires on an actual
 // number) correctly skips it; only llmConfidence's own threshold applies,
 // same as it would for any other submission.
 async function postNoPhoto(req, res) {
@@ -188,7 +190,7 @@ async function postNoPhoto(req, res) {
       rawScore: acuity.rawScore,
       decayCategory: acuity.category,
       queuedAt: new Date().toISOString(),
-      autoFloor: shouldAutoFloor(confidenceMeta) ? { active: true, flooredAt: new Date().toISOString() } : null,
+      autoFloor: buildAutoFloor(confidenceMeta),
     });
 
     res.json({ session: updated, cv: null, acuity });

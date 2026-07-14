@@ -63,10 +63,20 @@ module.exports = {
   // CvServiceClient - ml-service base URL
   cvServiceUrl: optional('CV_SERVICE_URL', 'http://localhost:8000'),
 
-  // ContactCenterService - Webex Contact Center
+  // ContactCenterService / WebexAuthService - Webex Contact Center OAuth
+  // Integration. Authorization/token endpoints are Webex's fixed, published
+  // URLs (not per-integration like Duo's) - see WebexAuthService.js.
   webexCcClientId: optional('WEBEX_CC_CLIENT_ID', null),
   webexCcClientSecret: optional('WEBEX_CC_CLIENT_SECRET', null),
   webexCcOrgId: optional('WEBEX_CC_ORG_ID', null),
+  // Must exactly match a Redirect URI configured on the Webex Integration.
+  webexCcRedirectUri: optional('WEBEX_CC_REDIRECT_URI', 'http://localhost:4000/admin/webex-cc/callback'),
+  // Signs the short-lived state param carried through the one-time admin
+  // consent redirect round-trip - see WebexAuthService.js.
+  webexCcStateSecret: optional('WEBEX_CC_STATE_SECRET', 'dev-insecure-webex-cc-state-secret'),
+  // Space-separated OAuth scopes requested at admin-consent time - keep this
+  // to the cjp:* Contact Center scopes actually used; least-privilege.
+  webexCcScopes: optional('WEBEX_CC_SCOPES', 'cjp:task_read cjp:task_write cjp:config_read'),
 
   // Voice auth (voiceAuth.js) - Cisco Webex AI Agent Studio's webhook.
   // Placeholder shared-secret scheme until a real Agent Studio tenant exists

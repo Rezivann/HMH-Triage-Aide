@@ -21,6 +21,12 @@ const acuityScoreSchema = new mongoose.Schema(
     autoFloor: {
       active: { type: Boolean, default: false },
       flooredAt: { type: Date, default: null },
+      // Which ReviewRoutingService.evaluateAutoFloor() condition triggered
+      // this (capture_quality_failed/findings_disagreement/low_cv_confidence/
+      // low_llm_confidence) - confidence is the specific number that
+      // breached LOW_CONFIDENCE_THRESHOLD, null for the two boolean reasons.
+      reason: { type: String, default: null },
+      confidence: { type: Number, default: null },
     },
 
     // The captured wound photo + Stage 2/3 CV output, persisted so the nurse

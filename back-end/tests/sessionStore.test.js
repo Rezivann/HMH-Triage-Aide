@@ -81,13 +81,18 @@ describe('updateSession', () => {
       rawScore: 525,
       decayCategory: 'severe_abdominal_pain',
       queuedAt,
-      autoFloor: { active: true, flooredAt: queuedAt },
+      autoFloor: { active: true, flooredAt: queuedAt, reason: 'low_cv_confidence', confidence: 0.42 },
     });
 
     expect(updated.rawScore).toBe(525);
     expect(updated.decayCategory).toBe('severe_abdominal_pain');
     expect(new Date(updated.queuedAt).toISOString()).toBe(queuedAt);
-    expect(updated.autoFloor).toEqual({ active: true, flooredAt: expect.anything() });
+    expect(updated.autoFloor).toEqual({
+      active: true,
+      flooredAt: expect.anything(),
+      reason: 'low_cv_confidence',
+      confidence: 0.42,
+    });
 
     // Re-fetching independently proves this actually persisted, not just
     // that updateSession's own return value carried it through.

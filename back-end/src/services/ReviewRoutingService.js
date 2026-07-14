@@ -18,17 +18,35 @@ function forceEscalate(findings) {
 // score below threshold. This is a floor on trust, not on acuity.
 const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
-function shouldAutoFloor(confidenceMeta) {
-  if (!confidenceMeta) return false;
+// Checked in this order, first match wins - a nurse reviewing why a patient
+// got floored should see the single most relevant reason, not every
+// condition that happened to also be true. confidence is null for the two
+// boolean-only reasons (there's no single number driving the decision).
+function evaluateAutoFloor(confidenceMeta) {
+  if (!confidenceMeta) return null;
 
   const { cvConfidence, llmConfidence, captureQualityPassed, findingsAgreement } = confidenceMeta;
 
-  if (captureQualityPassed === false) return true;
-  if (findingsAgreement === false) return true;
-  if (typeof cvConfidence === 'number' && cvConfidence < LOW_CONFIDENCE_THRESHOLD) return true;
-  if (typeof llmConfidence === 'number' && llmConfidence < LOW_CONFIDENCE_THRESHOLD) return true;
+  if (captureQualityPassed === false) return { reason: 'capture_quality_failed', confidence: null };
+  if (findingsAgreement === false) return { reason: 'findings_disagreement', confidence: null };
+  if (typeof cvConfidence === 'number' && cvConfidence < LOW_CONFIDENCE_THRESHOLD) {
+    return { reason: 'low_cv_confidence', confidence: cvConfidence };
+  }
+  if (typeof llmConfidence === 'number' && llmConfidence < LOW_CONFIDENCE_THRESHOLD) {
+    return { reason: 'low_llm_confidence', confidence: llmConfidence };
+  }
 
-  return false;
+  return null;
 }
 
-module.exports = { forceEscalate, shouldAutoFloor, HARD_FLAG_CATEGORIES, LOW_CONFIDENCE_THRESHOLD };
+function shouldAutoFloor(confidenceMeta) {
+  return evaluateAutoFloor(confidenceMeta) !== null;
+}
+
+module.exports = {
+  forceEscalate,
+  shouldAutoFloor,
+  evaluateAutoFloor,
+  HARD_FLAG_CATEGORIES,
+  LOW_CONFIDENCE_THRESHOLD,
+};
