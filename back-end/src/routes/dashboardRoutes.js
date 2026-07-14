@@ -3,12 +3,14 @@ const nurseAuth = require('../middleware/nurseAuth');
 const auditLog = require('../middleware/auditLog');
 const dashboardController = require('../controllers/dashboardController');
 const duoAuthController = require('../controllers/duoAuthController');
-const { nodeEnv } = require('../config/env');
+const { nodeEnv, allowDevLoginInProduction } = require('../config/env');
 
 const router = express.Router();
 
 // Dev-only - real Duo SSO replaces this route entirely, not just its logic.
-if (nodeEnv !== 'production') {
+// allowDevLoginInProduction is a deliberate, temporary escape hatch (see
+// config/env.js) for when Duo access itself is unavailable.
+if (nodeEnv !== 'production' || allowDevLoginInProduction) {
   router.post('/dev-login', dashboardController.devLogin);
 }
 

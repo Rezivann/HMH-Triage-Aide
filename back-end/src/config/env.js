@@ -7,6 +7,14 @@ function optional(name, fallback) {
 
 module.exports = {
   nodeEnv: optional('NODE_ENV', 'development'),
+  // Explicit opt-in escape hatch to unlock /dashboard/dev-login in
+  // production - never flip this on by default. Exists only because Duo
+  // account access can itself get blocked (first-enrollment lockouts,
+  // support tickets), and dev-login is otherwise the sole way into the
+  // dashboard. Anyone with the live URL can mint a nurse session for any
+  // nurseId/siteAccess while this is true - turn it back off (unset the var
+  // or set to anything but 'true') the moment real Duo access is restored.
+  allowDevLoginInProduction: optional('ALLOW_DEV_LOGIN_IN_PRODUCTION', 'false') === 'true',
   port: parseInt(optional('PORT', '4000'), 10),
 
   databaseUrl: optional('DATABASE_URL', 'mongodb://localhost:27017/llmtriage'),
