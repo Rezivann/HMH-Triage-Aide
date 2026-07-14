@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:4000';
 const NURSE_TOKEN_STORAGE_KEY = 'llmtriage.nurseToken';
 
 async function request(path, { method = 'GET', headers = {}, body, authHeader } = {}) {
@@ -25,10 +25,10 @@ async function request(path, { method = 'GET', headers = {}, body, authHeader } 
 }
 
 // Kiosk device key - baked into device config at provisioning in production.
-// VITE_KIOSK_API_KEY is a dev-only fallback so `npm run dev` works locally
+// PUBLIC_KIOSK_API_KEY is a dev-only fallback so `npm run dev` works locally
 // without going through Control Hub provisioning.
 function kioskRequest(path, options = {}) {
-  const kioskApiKey = import.meta.env.VITE_KIOSK_API_KEY;
+  const kioskApiKey = import.meta.env.PUBLIC_KIOSK_API_KEY;
   return request(path, { ...options, authHeader: { 'x-kiosk-api-key': kioskApiKey } });
 }
 
