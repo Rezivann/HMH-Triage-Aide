@@ -1,5 +1,23 @@
 const { openaiApiKey } = require('../config/env');
 
+// Whisper identifies the audio container from the uploaded filename's
+// extension, not the multipart Content-Type - a file with no extension (or
+// an unrecognized one) is rejected outright. Strip codec params
+// (e.g. "audio/webm;codecs=opus") before matching.
+const EXTENSION_BY_MIME_TYPE = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+};
+
+function extensionFor(mimeType) {
+  const bareType = mimeType.split(';')[0].trim();
+  return EXTENSION_BY_MIME_TYPE[bareType] || 'webm';
+}
+
 // Fallback speech-to-text for browsers with no SpeechRecognition API (Webex
 // Desk's RoomOS browser) - the client records raw audio and sends it here
 // instead of getting a transcript client-side. Separate provider from
@@ -15,7 +33,7 @@ class TranscriptionService {
     }
 
     const formData = new FormData();
-    formData.append('file', new Blob([audioBuffer], { type: mimeType }), 'audio');
+    formData.append('file', new Blob([audioBuffer], { type: mimeType }), `audio.${extensionFor(mimeType)}`);
     formData.append('model', 'whisper-1');
 
     const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {

@@ -246,6 +246,9 @@ async function postTranscribe(req, res) {
     const transcript = await transcriptionService.transcribe(audioBuffer, mimeType || 'audio/webm');
     res.json({ transcript });
   } catch (err) {
+    // Logged server-side (not just returned to the client) since the kiosk
+    // device has no devtools to read the response body from.
+    console.error('Transcription failed:', err.message);
     res.status(502).json({ error: 'transcription_failed', message: err.message });
   }
 }
