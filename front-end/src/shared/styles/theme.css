@@ -324,6 +324,29 @@ video {
   margin: 0 0 var(--space-3);
 }
 
+/* Deliberately bigger/bolder than the default [role='alert'] treatment
+   above - for safety-critical messages (kiosk-entry bleeding-out warning,
+   critical-acuity escalation) that must be impossible to miss, not routine
+   form-validation errors. Full-width block, not the compact inline alert. */
+.alert-banner {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-weight: 800;
+  font-size: var(--text-lg);
+  line-height: 1.35;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  border: 2px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.alert-banner--large {
+  font-size: var(--text-xl);
+  padding: var(--space-5);
+}
+
 .tabular-nums {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

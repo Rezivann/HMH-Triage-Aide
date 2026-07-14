@@ -21,10 +21,32 @@ async function listQueue(req, res) {
   const { siteAccess } = req.nurse;
 
   const sessions = await store.listSessions({ locationIds: siteAccess });
-  const queued = sessions.filter((s) => s.rawScore !== null);
+  // status check (not just rawScore) matters once clearQueue exists below -
+  // a cleared session keeps its historical rawScore (so CaseDetail can still
+  // show it) but must not reappear in the ranked queue.
+  const queued = sessions.filter((s) => s.rawScore !== null && s.status === 'queued');
   const ranked = sortQueue(queued, { now: new Date(), categoryDecay: acuityPolicyStore.getCategoryDecay() });
 
   res.json({ queue: ranked });
+}
+
+// Bulk-closes every currently-queued session in the nurse's own locations -
+// end-of-shift/board-reset type action, not a per-patient decision (that's
+// override/claim). Deliberately does not touch force_escalated or
+// already-claimed-but-still-queued sessions differently - claim only sets
+// claimedBy, never changes status off 'queued' (see claim() below), so a
+// claimed-but-not-yet-closed patient is still 'queued' and would be cleared
+// too; the frontend's confirmation warning is the safeguard here, not a
+// narrower server-side filter.
+async function clearQueue(req, res) {
+  const { siteAccess } = req.nurse;
+
+  const sessions = await store.listSessions({ locationIds: siteAccess });
+  const queued = sessions.filter((s) => s.status === 'queued');
+
+  await Promise.all(queued.map((s) => store.updateSession(s.sessionId, { status: 'closed' })));
+
+  res.json({ cleared: queued.length });
 }
 
 function getAcuityPolicy(req, res) {
@@ -116,4 +138,13 @@ async function override(req, res) {
   res.json(updated);
 }
 
-module.exports = { devLogin, listQueue, getSessionDetail, claim, override, getAcuityPolicy, updateAcuityPolicy };
+module.exports = {
+  devLogin,
+  listQueue,
+  clearQueue,
+  getSessionDetail,
+  claim,
+  override,
+  getAcuityPolicy,
+  updateAcuityPolicy,
+};

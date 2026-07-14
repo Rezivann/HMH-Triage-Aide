@@ -4,12 +4,29 @@ const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const CvServiceClient = require('../services/CvServiceClient');
 const LlmService = require('../services/LlmService');
 const TranscriptionService = require('../services/TranscriptionService');
-const { forceEscalate, evaluateAutoFloor } = require('../services/ReviewRoutingService');
+const { forceEscalate, isCriticalScore, evaluateAutoFloor } = require('../services/ReviewRoutingService');
 
 function buildAutoFloor(confidenceMeta) {
   const result = evaluateAutoFloor(confidenceMeta);
   if (!result) return null;
   return { active: true, flooredAt: new Date().toISOString(), reason: result.reason, confidence: result.confidence };
+}
+
+// Second force-escalate trigger, alongside forceEscalate(findings)'s
+// hardFlag check - fires once the synthesized acuity score itself crosses
+// CRITICAL_SCORE_THRESHOLD, regardless of what path produced it (photo or
+// verbal-only). rawScore/decayCategory/queuedAt are still persisted (unlike
+// the hardFlag branch, which never computes a score at all) so the
+// dashboard can show why this got escalated - status !== 'queued' already
+// keeps it out of the ranked queue (see dashboardController.listQueue).
+async function escalateForCriticalScore(sessionId, acuity, extraFields) {
+  return store.updateSession(sessionId, {
+    status: 'force_escalated',
+    rawScore: acuity.rawScore,
+    decayCategory: acuity.category,
+    queuedAt: new Date().toISOString(),
+    ...extraFields,
+  });
 }
 const { trackTokenSecret, photoTokenSecret } = require('../config/env');
 
@@ -95,6 +112,15 @@ async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
 
   const acuity = await llmService.synthesizeAcuity(narrative, findings.findings);
 
+  if (isCriticalScore(acuity.rawScore)) {
+    return res.status(202).json({
+      session: await escalateForCriticalScore(session.sessionId, acuity, cvRecord),
+      cv: findings,
+      acuity,
+      escalated: true,
+    });
+  }
+
   const updated = await store.updateSession(session.sessionId, {
     status: 'queued',
     rawScore: acuity.rawScore,
@@ -174,6 +200,15 @@ async function postNoPhoto(req, res) {
       captureQualityPassed: true,
       findingsAgreement: true,
     };
+
+    if (isCriticalScore(acuity.rawScore)) {
+      return res.status(202).json({
+        session: await escalateForCriticalScore(sessionId, acuity, {}),
+        cv: null,
+        acuity,
+        escalated: true,
+      });
+    }
 
     const updated = await store.updateSession(sessionId, {
       status: 'queued',

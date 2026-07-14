@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useKioskSession } from './hooks/useKioskSession';
+import KioskLanding from './components/KioskLanding';
 import ConversationView from './components/ConversationView';
 import PhotoCaptureQR from './components/PhotoCaptureQR';
 import PhotoCaptureFallback from './components/PhotoCaptureFallback';
 import EndScreen from './components/EndScreen';
+import CriticalAlert from './components/CriticalAlert';
 import PageShell from '../../shared/components/PageShell';
 import MotionCard from '../../shared/components/MotionCard';
 import MotionButton from '../../shared/components/MotionButton';
@@ -26,8 +28,13 @@ export default function KioskApp() {
     submitWithoutPhoto,
     intakeStatus,
   } = useKioskSession();
+  const [landed, setLanded] = useState(false);
   const [step, setStep] = useState(STEPS.CONVERSATION);
   const [usingFallback, setUsingFallback] = useState(false);
+  // Set once a submission comes back force_escalated (hardFlag category or
+  // critical acuity score - see back-end's ReviewRoutingService) - swaps
+  // EndScreen for CriticalAlert instead of the normal "you're all set" flow.
+  const [escalated, setEscalated] = useState(false);
   const autoSubmittedRef = useRef(false);
 
   // No button, no waiting for a tap - a voice-only patient has no way to
@@ -48,6 +55,21 @@ export default function KioskApp() {
     }
   }, [intakeStatus]);
 
+  // Landing (warning + Start button) renders immediately, before checking
+  // session status - it must never be blocked on the background session
+  // creation request finishing. The "Starting your session..."/error states
+  // below only matter once the patient has actually pressed Start.
+  if (!landed) {
+    return (
+      <PageShell>
+        <motion.h1 variants={fadeUp} initial="hidden" animate="visible">
+          LLMTriage
+        </motion.h1>
+        <KioskLanding onStart={() => setLanded(true)} />
+      </PageShell>
+    );
+  }
+
   if (status === 'creating')
     return (
       <PageShell>
@@ -61,19 +83,23 @@ export default function KioskApp() {
       </PageShell>
     );
 
-  function handlePhoneSubmitted() {
+  function handlePhoneSubmitted(session) {
     // The phone already called POST /mobile-capture/:photoToken/photo by the
-    // time PhotoCaptureQR's polling sees the status flip - nothing left to submit.
+    // time PhotoCaptureQR's polling sees the status flip - nothing left to
+    // submit, just reflect what that submission already decided.
+    if (session?.status === 'force_escalated') setEscalated(true);
     setStep(STEPS.END);
   }
 
   async function handleFallbackCaptured({ imageBase64, woundBox }) {
-    await submitPhoto({ imageBase64, woundBox });
+    const data = await submitPhoto({ imageBase64, woundBox });
+    if (data?.escalated) setEscalated(true);
     setStep(STEPS.END);
   }
 
   async function handleSubmitWithoutPhoto() {
-    await submitWithoutPhoto();
+    const data = await submitWithoutPhoto();
+    if (data?.escalated) setEscalated(true);
     setStep(STEPS.END);
   }
 
@@ -117,7 +143,7 @@ export default function KioskApp() {
 
         {step === STEPS.END && (
           <motion.div key="end" variants={fadeUp} initial="hidden" animate="visible" exit="hidden">
-            <EndScreen sessionId={sessionId} trackUrl={trackUrl} />
+            {escalated ? <CriticalAlert /> : <EndScreen sessionId={sessionId} trackUrl={trackUrl} />}
           </motion.div>
         )}
       </AnimatePresence>

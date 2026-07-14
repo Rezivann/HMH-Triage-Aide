@@ -12,6 +12,18 @@ function forceEscalate(findings) {
   return findings.hardFlags.some((flag) => HARD_FLAG_CATEGORIES.includes(flag));
 }
 
+// Second, independent trigger for the same force-escalate path as
+// forceEscalate above - this one fires on the synthesized acuity score
+// itself rather than a categorical hardFlag, since a presentation can be
+// critical without tripping any of the fixed hardFlag categories (e.g.
+// severe chest pain described purely verbally, no photo at all). Same
+// 0-1000 scale as utils/queueSort.js.
+const CRITICAL_SCORE_THRESHOLD = 700;
+
+function isCriticalScore(rawScore) {
+  return typeof rawScore === 'number' && rawScore >= CRITICAL_SCORE_THRESHOLD;
+}
+
 // Guarantees a top-10% queue slot (see utils/queueSort.js computeAutoFloor)
 // when the pipeline itself doesn't trust its own output - failed capture
 // quality, disagreement between CV and LLM findings, or a low confidence
@@ -42,8 +54,10 @@ function shouldAutoFloor(confidenceMeta) {
 
 module.exports = {
   forceEscalate,
+  isCriticalScore,
   shouldAutoFloor,
   evaluateAutoFloor,
   HARD_FLAG_CATEGORIES,
   LOW_CONFIDENCE_THRESHOLD,
+  CRITICAL_SCORE_THRESHOLD,
 };

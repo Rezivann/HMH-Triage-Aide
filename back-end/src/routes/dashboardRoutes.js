@@ -22,6 +22,7 @@ router.get('/duo-callback', duoAuthController.callback);
 router.use(nurseAuth, auditLog);
 
 router.get('/queue', dashboardController.listQueue);
+router.post('/clear-queue', dashboardController.clearQueue);
 router.get('/session/:id', dashboardController.getSessionDetail);
 router.post('/claim/:id', dashboardController.claim);
 router.post('/override/:id', dashboardController.override);
