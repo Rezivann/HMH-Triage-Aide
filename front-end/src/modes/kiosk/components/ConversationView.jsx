@@ -9,16 +9,16 @@ const SpeechRecognitionCtor =
 
 // Browser-native stand-in for what Cisco Webex AI Agent Studio's voice
 // channel does for real (see back-end's voiceRoutes.js/voiceAuth.js) - mic
-// in via SpeechRecognition, spoken reply out via speechSynthesis, feeding
-// the exact same onSend/sendMessage path a typed turn already uses. This
-// lets the kiosk demo the intended "patient just starts talking" experience
-// today, without a live Agent Studio tenant.
+// in via SpeechRecognition, feeding the exact same onSend/sendMessage path a
+// typed turn already uses. Text-to-speech was dropped (sounded too robotic
+// to be worth it) - the assistant's reply is only ever shown as text, same
+// as the typed-conversation path.
 export default function ConversationView({ messages, onSend, onContinue, sending, intakeStatus }) {
   const [draft, setDraft] = useState('');
   const [voiceMode, setVoiceMode] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
-  const lastSpokenIndexRef = useRef(-1);
+  const lastHeardIndexRef = useRef(-1);
 
   function startListening() {
     if (!SpeechRecognitionCtor) return;
@@ -34,8 +34,8 @@ export default function ConversationView({ messages, onSend, onContinue, sending
     };
     // Recognition stops itself after a pause in speech (one turn) - this
     // just clears the "listening" indicator, not an error state. Resuming
-    // for the next turn happens after the assistant's reply is spoken (see
-    // the effect below), not from here, so it doesn't restart mid-reply.
+    // for the next turn happens once the assistant's reply arrives (see the
+    // effect below), not from here, so it doesn't restart mid-request.
     recognition.onend = () => setListening(false);
     recognition.onerror = (event) => {
       // event.error is one of SpeechRecognition's fixed error codes
@@ -46,8 +46,23 @@ export default function ConversationView({ messages, onSend, onContinue, sending
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+
+    // Some embedded/kiosk-mode Chromium browsers (seen on Webex Desk
+    // hardware) never surface the native mic permission prompt when
+    // SpeechRecognition.start() is called directly - getUserMedia() is a
+    // more reliably-honored trigger for that same permission prompt across
+    // browsers. The stream itself isn't used (SpeechRecognition opens its
+    // own), it's purely to force the prompt before recognition tries to run.
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((stream) => {
+        stream.getTracks().forEach((track) => track.stop());
+        recognition.start();
+        setListening(true);
+      })
+      .catch((err) => {
+        console.error('Microphone permission request failed:', err.name, err.message);
+      });
   }
 
   function handleStartVoice() {
@@ -61,44 +76,37 @@ export default function ConversationView({ messages, onSend, onContinue, sending
   function handleStopVoice() {
     setVoiceMode(false);
     recognitionRef.current?.stop();
-    window.speechSynthesis?.cancel();
     setListening(false);
   }
 
-  // Speaks each new assistant message aloud while in voice mode, then
-  // resumes listening for the patient's next turn once speech finishes -
-  // the actual back-and-forth loop. Guarded by lastSpokenIndexRef so a
-  // message is never spoken twice across re-renders.
+  // Resumes listening for the patient's next turn as soon as the
+  // assistant's reply arrives - the actual back-and-forth loop, now that
+  // there's no speech playback to wait for first. Guarded by
+  // lastHeardIndexRef so a reply never triggers this more than once across
+  // re-renders.
   useEffect(() => {
-    if (!voiceMode || messages.length === 0) return;
+    if (!voiceMode || messages.length === 0 || intakeStatus !== 'asking') return;
     const lastIndex = messages.length - 1;
-    if (lastIndex === lastSpokenIndexRef.current) return;
+    if (lastIndex === lastHeardIndexRef.current) return;
     const last = messages[lastIndex];
     if (last.role !== 'assistant') return;
 
-    lastSpokenIndexRef.current = lastIndex;
-
-    const utterance = new SpeechSynthesisUtterance(last.text);
-    utterance.onend = () => {
-      if (intakeStatus === 'asking') startListening();
-    };
-    window.speechSynthesis.speak(utterance);
+    lastHeardIndexRef.current = lastIndex;
+    startListening();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, voiceMode]);
+  }, [messages, voiceMode, intakeStatus]);
 
-  // Intake wrapped up (or the screen changed away) - nothing left to say or
-  // listen for, so stop cleanly rather than leaving the mic hot.
+  // Intake wrapped up (or the screen changed away) - nothing left to listen
+  // for, so stop cleanly rather than leaving the mic hot.
   useEffect(() => {
     if (intakeStatus !== 'asking') {
       recognitionRef.current?.stop();
-      window.speechSynthesis?.cancel();
     }
   }, [intakeStatus]);
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
-      window.speechSynthesis?.cancel();
     };
   }, []);
 
@@ -170,7 +178,7 @@ export default function ConversationView({ messages, onSend, onContinue, sending
                 animate={listening ? { opacity: [1, 0.55, 1] } : { opacity: 1 }}
                 transition={{ duration: 1.2, repeat: listening ? Infinity : 0, ease: 'easeInOut' }}
               >
-                {listening ? '🎤 Listening...' : '🔊 Speaking...'}
+                {listening ? '🎤 Listening...' : 'Waiting...'}
               </motion.p>
               <MotionButton type="button" onClick={handleStopVoice}>
                 Stop
