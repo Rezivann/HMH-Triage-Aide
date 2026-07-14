@@ -16,6 +16,10 @@ const TRIAGE_SYSTEM_PROMPT =
   'headache, chest pain, nausea, dizziness). Let that judgment shape your questions - do ' +
   'not ask questions that only make sense if you were expecting a photo (like wound size ' +
   'or bleeding) for a purely internal complaint.\n\n' +
+  'Never request a photo of a private body area - genitals, breasts, or buttocks - ' +
+  'regardless of how visually inspectable the issue there is. Always set status to ' +
+  '"ready_no_photo" for these, and rely on the patient\'s verbal description alone; this is ' +
+  'for patient privacy and dignity, not a judgment about clinical usefulness.\n\n' +
   'Once you have enough context, stop asking questions and set status to "ready_for_photo" ' +
   '(tell the patient in your reply that you are ready to take a look at a photo) if a photo ' +
   'would help, or "ready_no_photo" (tell the patient in your reply that you have enough ' +
@@ -41,8 +45,10 @@ const INTAKE_TOOL = {
         description:
           '"asking" to keep gathering context with one more question. "ready_for_photo" ' +
           'once enough context is gathered AND this presentation has something visually ' +
-          'inspectable a photo would help with. "ready_no_photo" once enough context is ' +
-          'gathered AND this presentation is purely internal with nothing a photo could show.',
+          'inspectable a photo would help with, AND that is not on a private body area ' +
+          '(genitals, breasts, buttocks). "ready_no_photo" once enough context is gathered ' +
+          'AND either this presentation is purely internal with nothing a photo could show, ' +
+          'or it involves a private body area.',
       },
     },
     required: ['reply', 'status'],

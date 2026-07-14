@@ -46,7 +46,7 @@ export default function EndScreen({ sessionId, trackUrl }) {
               // adjoining block margins collapse to the larger value, so
               // this is what actually widens the gap below the QR code
               // specifically, not just duplicating the existing spacing.
-              marginBottom: 'var(--space-5)',
+              marginBottom: 'calc(var(--space-3) + 0.5rem)',
             }}
           >
             <QRCodeSVG value={trackUrl} size={220} />
