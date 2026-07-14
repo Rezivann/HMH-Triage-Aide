@@ -6,6 +6,8 @@ import { fadeUpSmall } from '../../../shared/motion';
 
 const SpeechRecognitionCtor =
   typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+const canRecordAudio =
+  typeof window !== 'undefined' && !!window.MediaRecorder && !!navigator.mediaDevices?.getUserMedia;
 
 // Browser-native stand-in for what Cisco Webex AI Agent Studio's voice
 // channel does for real (see back-end's voiceRoutes.js/voiceAuth.js) - mic
@@ -13,11 +15,21 @@ const SpeechRecognitionCtor =
 // typed turn already uses. Text-to-speech was dropped (sounded too robotic
 // to be worth it) - the assistant's reply is only ever shown as text, same
 // as the typed-conversation path.
-export default function ConversationView({ messages, onSend, onContinue, sending, intakeStatus }) {
+//
+// SpeechRecognition doesn't exist on every browser (Webex Desk's RoomOS
+// browser has none) - onTranscribe is the fallback for those: record raw
+// audio with MediaRecorder and send it to the backend's Whisper-backed
+// /kiosk/transcribe instead of transcribing client-side. Claude has no
+// audio-input modality, so this can't just be routed through LlmService.
+export default function ConversationView({ messages, onSend, onTranscribe, onContinue, sending, intakeStatus }) {
   const [draft, setDraft] = useState('');
   const [voiceMode, setVoiceMode] = useState(false);
   const [listening, setListening] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const lastHeardIndexRef = useRef(-1);
 
   function startListening() {
@@ -77,6 +89,58 @@ export default function ConversationView({ messages, onSend, onContinue, sending
     setVoiceMode(false);
     recognitionRef.current?.stop();
     setListening(false);
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Push-to-talk fallback for browsers with no SpeechRecognition - one
+  // record/stop cycle per turn (no hands-free auto-continuation like the
+  // SpeechRecognition path above, since there's no "recognition ended"
+  // signal to resume on).
+  async function startRecording() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error('Microphone permission request failed:', err.name, err.message);
+      return;
+    }
+
+    const recorder = new MediaRecorder(stream);
+    audioChunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) audioChunksRef.current.push(event.data);
+    };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      setTranscribing(true);
+      try {
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
+        const audioBase64 = await blobToBase64(blob);
+        const transcript = await onTranscribe(audioBase64, recorder.mimeType);
+        if (transcript?.trim()) onSend(transcript.trim());
+      } catch (err) {
+        console.error('Transcription failed:', err.message);
+      } finally {
+        setTranscribing(false);
+      }
+    };
+
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
   }
 
   // Resumes listening for the patient's next turn as soon as the
@@ -164,6 +228,41 @@ export default function ConversationView({ messages, onSend, onContinue, sending
           Send
         </MotionButton>
       </form>
+
+      {!SpeechRecognitionCtor && !canRecordAudio && (
+        // Visible instead of just hiding the button - "nothing renders" and
+        // "renders but voice input is unsupported" look identical to a user
+        // with no way to check devtools (e.g. on locked-down kiosk
+        // hardware), so this makes the actual cause checkable on-device.
+        <p className="status-pill status-pill--neutral" style={{ fontSize: '0.8rem' }}>
+          Voice input unavailable: this browser has no SpeechRecognition or microphone access API.
+        </p>
+      )}
+
+      {!SpeechRecognitionCtor && canRecordAudio && onTranscribe && (
+        <div className="row">
+          {transcribing ? (
+            <p className="status-pill status-pill--neutral">Transcribing...</p>
+          ) : !recording ? (
+            <MotionButton type="button" className="btn-primary" onClick={startRecording} disabled={sending}>
+              🎙️ Record & Send
+            </MotionButton>
+          ) : (
+            <>
+              <motion.p
+                className="status-pill status-pill--accent"
+                animate={{ opacity: [1, 0.55, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                🔴 Recording...
+              </motion.p>
+              <MotionButton type="button" onClick={stopRecording}>
+                Stop & Send
+              </MotionButton>
+            </>
+          )}
+        </div>
+      )}
 
       {SpeechRecognitionCtor && (
         <div className="row">

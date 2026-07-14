@@ -21,6 +21,7 @@ export default function KioskApp() {
     error,
     messages,
     sendMessage,
+    transcribeAudio,
     submitPhoto,
     submitWithoutPhoto,
     intakeStatus,
@@ -84,6 +85,7 @@ export default function KioskApp() {
             <ConversationView
               messages={messages}
               onSend={sendMessage}
+              onTranscribe={transcribeAudio}
               onContinue={() => setStep(STEPS.PHOTO)}
               intakeStatus={intakeStatus}
             />

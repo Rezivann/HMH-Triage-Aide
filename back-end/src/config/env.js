@@ -63,6 +63,11 @@ module.exports = {
   // CvServiceClient - ml-service base URL
   cvServiceUrl: optional('CV_SERVICE_URL', 'http://localhost:8000'),
 
+  // TranscriptionService - OpenAI Whisper, for browsers with no
+  // SpeechRecognition API (e.g. Webex Desk's RoomOS browser). Claude has no
+  // audio-input modality, so this is a separate provider from LlmService.
+  openaiApiKey: optional('OPENAI_API_KEY', null),
+
   // ContactCenterService / WebexAuthService - Webex Contact Center OAuth
   // Integration. Authorization/token endpoints are Webex's fixed, published
   // URLs (not per-integration like Duo's) - see WebexAuthService.js.

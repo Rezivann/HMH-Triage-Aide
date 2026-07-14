@@ -3,6 +3,7 @@ const store = require('../services/SessionStore');
 const acuityPolicyStore = require('./fakeAcuityPolicyStore');
 const CvServiceClient = require('../services/CvServiceClient');
 const LlmService = require('../services/LlmService');
+const TranscriptionService = require('../services/TranscriptionService');
 const { forceEscalate, evaluateAutoFloor } = require('../services/ReviewRoutingService');
 
 function buildAutoFloor(confidenceMeta) {
@@ -14,6 +15,7 @@ const { trackTokenSecret, photoTokenSecret } = require('../config/env');
 
 const cvServiceClient = new CvServiceClient();
 const llmService = new LlmService();
+const transcriptionService = new TranscriptionService();
 
 async function createSession(req, res) {
   const { kioskId, locationId } = req.kiosk;
@@ -244,4 +246,28 @@ async function getSessionStatus(req, res) {
   res.json(session);
 }
 
-module.exports = { createSession, postMessage, postPhoto, postMobilePhoto, postNoPhoto, getSessionStatus };
+// Fallback for browsers with no SpeechRecognition API (Webex Desk) - the
+// client records raw audio instead of transcribing it locally, and this
+// endpoint does the transcription server-side via TranscriptionService.
+async function postTranscribe(req, res) {
+  const { audioBase64, mimeType } = req.body;
+  if (!audioBase64) return res.status(400).json({ error: 'audioBase64_required' });
+
+  try {
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    const transcript = await transcriptionService.transcribe(audioBuffer, mimeType || 'audio/webm');
+    res.json({ transcript });
+  } catch (err) {
+    res.status(502).json({ error: 'transcription_failed', message: err.message });
+  }
+}
+
+module.exports = {
+  createSession,
+  postMessage,
+  postPhoto,
+  postMobilePhoto,
+  postNoPhoto,
+  getSessionStatus,
+  postTranscribe,
+};

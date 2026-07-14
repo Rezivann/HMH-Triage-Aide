@@ -48,6 +48,20 @@ export function useKioskSession() {
     [sessionId]
   );
 
+  // Fallback for browsers with no SpeechRecognition API (Webex Desk) - the
+  // caller records raw audio client-side and this sends it to the backend's
+  // Whisper-backed /kiosk/transcribe instead of transcribing locally.
+  const transcribeAudio = useCallback(
+    async (audioBase64, mimeType) => {
+      const data = await kioskRequest('/kiosk/transcribe', {
+        method: 'POST',
+        body: { sessionId, audioBase64, mimeType },
+      });
+      return data.transcript;
+    },
+    [sessionId]
+  );
+
   const submitPhoto = useCallback(
     async (overrides = {}) => {
       const data = await kioskRequest('/kiosk/photo', {
@@ -80,6 +94,7 @@ export function useKioskSession() {
     error,
     messages,
     sendMessage,
+    transcribeAudio,
     photoResult,
     submitPhoto,
     submitWithoutPhoto,
