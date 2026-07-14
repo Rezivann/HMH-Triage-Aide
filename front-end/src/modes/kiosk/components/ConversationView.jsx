@@ -37,7 +37,13 @@ export default function ConversationView({ messages, onSend, onContinue, sending
     // for the next turn happens after the assistant's reply is spoken (see
     // the effect below), not from here, so it doesn't restart mid-reply.
     recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = (event) => {
+      // event.error is one of SpeechRecognition's fixed error codes
+      // (no-speech, audio-capture, not-allowed, network, etc) - surfaced to
+      // the console since this was previously failing completely silently.
+      console.error('SpeechRecognition error:', event.error);
+      setListening(false);
+    };
 
     recognitionRef.current = recognition;
     recognition.start();

@@ -2,6 +2,7 @@ const express = require('express');
 const nurseAuth = require('../middleware/nurseAuth');
 const auditLog = require('../middleware/auditLog');
 const dashboardController = require('../controllers/dashboardController');
+const duoAuthController = require('../controllers/duoAuthController');
 const { nodeEnv } = require('../config/env');
 
 const router = express.Router();
@@ -10,6 +11,11 @@ const router = express.Router();
 if (nodeEnv !== 'production') {
   router.post('/dev-login', dashboardController.devLogin);
 }
+
+// Public - these two routes *are* the auth mechanism, so they run before
+// nurseAuth rather than behind it (there's no session yet to validate).
+router.get('/login', duoAuthController.login);
+router.get('/duo-callback', duoAuthController.callback);
 
 router.use(nurseAuth, auditLog);
 

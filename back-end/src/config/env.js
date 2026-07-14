@@ -18,12 +18,26 @@ module.exports = {
   // Kiosk device auth (kioskAuth.js) - long-lived API key issued at provisioning
   kioskApiKeySecret: optional('KIOSK_API_KEY_SECRET', null),
 
-  // Nurse auth (nurseAuth.js) - Cisco Duo SSO against hospital AD
+  // Nurse auth (nurseAuth.js) - Cisco Duo SSO (Generic OIDC Relying Party
+  // application, Frameless Universal Prompt). Endpoint URLs come straight
+  // from the application's Metadata tab in the Duo Admin Panel rather than
+  // being derived from a single api host - Duo exposes full OIDC discovery
+  // fields (issuer/authorization/token/jwks) for this application type.
   duoClientId: optional('DUO_CLIENT_ID', null),
   duoClientSecret: optional('DUO_CLIENT_SECRET', null),
-  duoApiHost: optional('DUO_API_HOST', null),
+  duoIssuer: optional('DUO_ISSUER', null),
+  duoAuthorizationUrl: optional('DUO_AUTHORIZATION_URL', null),
+  duoTokenUrl: optional('DUO_TOKEN_URL', null),
+  duoJwksUrl: optional('DUO_JWKS_URL', null),
+  // Must exactly match the Redirect URI configured on the Duo application.
+  duoRedirectUri: optional('DUO_REDIRECT_URI', 'http://localhost:4000/dashboard/duo-callback'),
+  // Signs the short-lived state param (PKCE verifier + nonce) carried
+  // through the redirect round-trip to Duo and back - see DuoAuthService.js.
+  duoStateSecret: optional('DUO_STATE_SECRET', 'dev-insecure-duo-state-secret'),
   // Secret for the session token minted after Duo validation succeeds
   nurseSessionSecret: optional('NURSE_SESSION_SECRET', 'dev-insecure-nurse-secret'),
+  // Where duo-callback sends the browser after minting a nurse session.
+  frontendUrl: optional('FRONTEND_URL', 'http://localhost:5173'),
 
   // Tracker auth (trackAuth.js) - short-lived single-session scoped token
   trackTokenSecret: optional('TRACK_TOKEN_SECRET', 'dev-insecure-track-secret'),

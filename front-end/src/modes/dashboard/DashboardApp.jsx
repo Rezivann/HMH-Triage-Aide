@@ -11,7 +11,7 @@ import MotionButton from '../../shared/components/MotionButton';
 import { fadeUp } from '../../shared/motion';
 
 export default function DashboardApp() {
-  const { nurseId, isAuthenticated, login, error: authError } = useDashboardAuth();
+  const { nurseId, isAuthenticated, login, loginWithDuo, error: authError } = useDashboardAuth();
   const { queue, error: queueError, refetch } = useQueueSocket(isAuthenticated);
   const [selected, setSelected] = useState(null);
   const [idInput, setIdInput] = useState('');
@@ -22,17 +22,25 @@ export default function DashboardApp() {
       <PageShell>
         <MotionCard style={{ maxWidth: 400, margin: '0 auto' }}>
           <h1>Nurse dashboard</h1>
+          <MotionButton type="button" className="btn-primary" onClick={loginWithDuo}>
+            Log in with Duo
+          </MotionButton>
+          {authError && <p role="alert">{authError.message}</p>}
+
+          {/* Dev-only fallback - the backend 404s /dashboard/dev-login in
+              production, so this form only does anything against a local
+              dev backend. */}
           <form
             onSubmit={(event) => {
               event.preventDefault();
               login(idInput, ['loc-1']);
             }}
+            style={{ marginTop: 'var(--space-4)' }}
           >
             <input value={idInput} onChange={(event) => setIdInput(event.target.value)} placeholder="Nurse ID" />
-            <MotionButton type="submit" className="btn-primary" style={{ marginTop: 'var(--space-3)' }}>
+            <MotionButton type="submit" style={{ marginTop: 'var(--space-3)' }}>
               Log in (dev)
             </MotionButton>
-            {authError && <p role="alert">{authError.message}</p>}
           </form>
         </MotionCard>
       </PageShell>
