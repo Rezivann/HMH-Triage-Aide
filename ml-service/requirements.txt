@@ -4,11 +4,17 @@ pydantic
 python-dotenv
 httpx
 
-# Stage 1 - capture_validation.py blur check. opencv-python (not -headless) -
-# scripts/test_pipeline.py's --show-image needs cv2.imshow, which headless
-# builds deliberately strip out. This is a superset of headless, so nothing
-# in the actual FastAPI service loses anything by using it instead.
-opencv-python
+# Stage 1 - capture_validation.py blur check. opencv-python-headless, not
+# opencv-python - the deployed FastAPI service never touches GUI/window
+# functions, and the GUI build pulls in a real X11/Qt dependency chain
+# (libGL, then libxcb, then more after that) that a bare deploy container
+# doesn't have and has to be patched in one missing .so at a time - not worth
+# it when nothing here actually needs a window. headless has none of that.
+# scripts/test_pipeline.py's --show-image is the one thing that needs real
+# cv2.imshow - under headless the symbol still exists but raises a runtime
+# cv2.error the moment it's called, since no GUI backend is compiled in. See
+# that script's docstring for the one-time local swap needed to use that flag.
+opencv-python-headless
 numpy
 Pillow
 

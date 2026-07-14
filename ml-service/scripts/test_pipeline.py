@@ -11,8 +11,15 @@ status bar.
 --show-image opens an OpenCV window showing the box you sent MedSAM (blue), the
 bounding box MedSAM's mask actually landed on (red), and the mask's own outline
 (green) - lets you eyeball segmentation quality directly instead of just trusting
-the numbers. Requires opencv-python, not opencv-python-headless (see
-requirements.txt's comment on this).
+the numbers. Requires the GUI opencv-python build, not opencv-python-headless
+(which requirements.txt installs, deliberately - see its comment). cv2.imshow
+still exists as a symbol under headless, it just raises a runtime cv2.error
+("function is not implemented") the moment it's actually called - so this
+fails at the imshow() call, not at import time. To use --show-image locally,
+temporarily swap the GUI build into this one venv:
+    pip uninstall opencv-python-headless -y && pip install opencv-python
+(swap back before deploying anything from this venv, or just use a separate
+venv for this - the deployed service must keep using headless).
 """
 
 import argparse
