@@ -47,19 +47,27 @@ export default function PhotoCaptureFallback({ onCaptured, testImagesEnabled = f
   const [showTestImages, setShowTestImages] = useState(false);
   const [testImages, setTestImages] = useState(null); // null = not fetched yet
   const [loadingTestImages, setLoadingTestImages] = useState(false);
+  // 'environment' (rear camera) is the sensible default for a wound photo -
+  // patients are photographing their own body, not taking a selfie. A soft
+  // constraint (not { exact: ... }), so a single-camera device (e.g. a
+  // laptop used to test the kiosk fallback) just gets its one camera instead
+  // of throwing OverconstrainedError.
+  const [facingMode, setFacingMode] = useState('environment');
 
-  // Depends on `step`, not just mount-once - a retake returns to this same
-  // component instance (step flips WOUND_BOX -> CAMERA), and without this
-  // dependency the effect would never re-run: the video element that
-  // remounts on retake would get srcObject = undefined forever, while the
-  // original stream's tracks (attached to a now-gone video element) keep
-  // running - camera indicator stays lit, but nothing is shown.
+  // Depends on `step`/`facingMode`, not just mount-once - a retake returns to
+  // this same component instance (step flips WOUND_BOX -> CAMERA), and
+  // flipping the camera needs to tear down the old stream and request a
+  // fresh one with the new facingMode. Without this dependency the effect
+  // would never re-run: the video element that remounts on retake would get
+  // srcObject = undefined forever, while the original stream's tracks
+  // (attached to a now-gone video element) keep running - camera indicator
+  // stays lit, but nothing is shown.
   useEffect(() => {
     if (step !== STEPS.CAMERA) return undefined;
 
     let stream;
     navigator.mediaDevices
-      ?.getUserMedia({ video: true })
+      ?.getUserMedia({ video: { facingMode } })
       .then((s) => {
         stream = s;
         if (videoRef.current) videoRef.current.srcObject = s;
@@ -67,7 +75,11 @@ export default function PhotoCaptureFallback({ onCaptured, testImagesEnabled = f
       .catch((err) => setError(err.message));
 
     return () => stream?.getTracks().forEach((track) => track.stop());
-  }, [step]);
+  }, [step, facingMode]);
+
+  function handleFlipCamera() {
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+  }
 
   // Shared by a live capture, a file-picker upload, and a test image - all
   // three are just a Blob by the time they get here, so the quality gate and
@@ -177,6 +189,9 @@ export default function PhotoCaptureFallback({ onCaptured, testImagesEnabled = f
       <div className="row">
         <MotionButton type="button" className="btn-primary" onClick={handleCapture} disabled={checking}>
           {checking ? 'Checking...' : 'Capture Photo'}
+        </MotionButton>
+        <MotionButton type="button" onClick={handleFlipCamera} disabled={checking}>
+          Flip camera
         </MotionButton>
         <MotionButton type="button" onClick={() => fileInputRef.current?.click()} disabled={checking}>
           Upload from camera roll / files
