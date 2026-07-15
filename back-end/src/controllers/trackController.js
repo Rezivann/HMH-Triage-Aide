@@ -16,7 +16,12 @@ async function getStatus(req, res) {
   // keep in sync). Exposes this patient's own position only - never score,
   // findings, or any other patient's data.
   const sessions = await store.listSessions({ locationIds: [session.locationId] });
-  const queued = sessions.filter((s) => s.rawScore !== null);
+  // Same status check as dashboardController.listQueue - without it, a
+  // closed (e.g. Clear Queue'd) or claimed session still has its historical
+  // rawScore and would keep occupying a ranked slot here forever, inflating
+  // every other patient's position even though the dashboard's own queue
+  // list correctly no longer shows them.
+  const queued = sessions.filter((s) => s.rawScore !== null && s.status === 'queued');
   const ranked = sortQueue(queued, { now: new Date(), categoryDecay: acuityPolicyStore.getCategoryDecay() });
   const mine = ranked.find((s) => s.sessionId === sessionId);
 

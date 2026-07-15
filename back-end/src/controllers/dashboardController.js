@@ -32,12 +32,10 @@ async function listQueue(req, res) {
 
 // Bulk-closes every currently-queued session in the nurse's own locations -
 // end-of-shift/board-reset type action, not a per-patient decision (that's
-// override/claim). Deliberately does not touch force_escalated or
-// already-claimed-but-still-queued sessions differently - claim only sets
-// claimedBy, never changes status off 'queued' (see claim() below), so a
-// claimed-but-not-yet-closed patient is still 'queued' and would be cleared
-// too; the frontend's confirmation warning is the safeguard here, not a
-// narrower server-side filter.
+// override/claim). Naturally leaves force_escalated and claimed sessions
+// alone - neither has status 'queued' (claim() sets status: 'claimed', not
+// just claimedBy), so a patient already being treated is never touched by
+// this bulk action.
 async function clearQueue(req, res) {
   const { siteAccess } = req.nurse;
 
@@ -92,7 +90,14 @@ async function claim(req, res) {
 
   // TODO: replace with ContactCenterService.queueToAgent() once a real Webex
   // CC tenant is provisioned (see services/ContactCenterService.js).
-  const updated = await store.updateSession(id, { claimedBy: nurseId });
+  // status: 'claimed' (already a valid Session enum value - see
+  // models/Session.js - just never actually set here before) is what pulls
+  // this patient out of every status === 'queued' query in one place:
+  // listQueue, clearQueue, and trackController's position ranking. Without
+  // this, claiming only set claimedBy, so a claimed-but-still-being-treated
+  // patient kept occupying a queue slot everywhere except the one place
+  // (trackController's with_nurse check) that looks at claimedBy directly.
+  const updated = await store.updateSession(id, { claimedBy: nurseId, status: 'claimed' });
   res.json(updated);
 }
 
