@@ -296,6 +296,28 @@ async function postTranscribe(req, res) {
   }
 }
 
+// Dev-only "use a test image" flow - the route this is wired to (see
+// kioskRoutes.js) is only registered when nodeEnv !== 'production', and
+// ml-service itself 404s /test-images in production too (defense in depth -
+// see ml-service/app/main.py), so this never does anything in a real deploy.
+async function listTestImages(req, res) {
+  try {
+    const { files } = await cvServiceClient.listTestImages();
+    res.json({ files });
+  } catch (err) {
+    res.status(502).json({ error: 'test_images_unavailable', message: err.message });
+  }
+}
+
+async function getTestImage(req, res) {
+  try {
+    const { imageBase64, mediaType } = await cvServiceClient.getTestImage(req.params.filename);
+    res.json({ imageBase64, mediaType });
+  } catch (err) {
+    res.status(502).json({ error: 'test_images_unavailable', message: err.message });
+  }
+}
+
 module.exports = {
   createSession,
   postMessage,
@@ -304,4 +326,6 @@ module.exports = {
   postNoPhoto,
   getSessionStatus,
   postTranscribe,
+  listTestImages,
+  getTestImage,
 };

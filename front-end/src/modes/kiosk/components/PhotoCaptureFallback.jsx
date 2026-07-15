@@ -3,6 +3,7 @@ import { checkPhotoQuality } from './QualityCheck';
 import WoundBoxSelector from './WoundBoxSelector';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
+import { kioskRequest } from '../../../shared/api/apiClient';
 
 // On-kiosk camera fallback for patients without a phone. Captures a still
 // frame, runs the on-device quality check, then hands off to WoundBoxSelector
@@ -22,13 +23,30 @@ function blobToBase64(blob) {
   });
 }
 
-export default function PhotoCaptureFallback({ onCaptured }) {
+function base64ToBlob(base64, mediaType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mediaType });
+}
+
+// testImagesEnabled is opt-in per caller, not a global feature flag - only
+// KioskApp's on-kiosk fallback passes it (see KioskApp.jsx), never
+// MobileCaptureApp. This is a dev tool for testing the pipeline against
+// planted photos (ml-service/test-images/), not something a patient using
+// their own phone should ever see, and it goes through kioskRequest (the
+// kiosk device's own auth), which has no reason to be exercised from the
+// public mobile-capture page.
+export default function PhotoCaptureFallback({ onCaptured, testImagesEnabled = false }) {
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(false);
   const [capturedBlob, setCapturedBlob] = useState(null);
   const [step, setStep] = useState(STEPS.CAMERA);
+  const [showTestImages, setShowTestImages] = useState(false);
+  const [testImages, setTestImages] = useState(null); // null = not fetched yet
+  const [loadingTestImages, setLoadingTestImages] = useState(false);
 
   // Depends on `step`, not just mount-once - a retake returns to this same
   // component instance (step flips WOUND_BOX -> CAMERA), and without this
@@ -51,10 +69,26 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     return () => stream?.getTracks().forEach((track) => track.stop());
   }, [step]);
 
-  async function handleCapture() {
+  // Shared by a live capture, a file-picker upload, and a test image - all
+  // three are just a Blob by the time they get here, so the quality gate and
+  // step transition only need writing once.
+  async function acceptBlob(blob, qualityFailMessage) {
     setChecking(true);
     setError(null);
 
+    const quality = await checkPhotoQuality(blob);
+    setChecking(false);
+
+    if (!quality.passed) {
+      setError(qualityFailMessage);
+      return;
+    }
+
+    setCapturedBlob(blob);
+    setStep(STEPS.WOUND_BOX);
+  }
+
+  async function handleCapture() {
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
@@ -62,16 +96,7 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     canvas.getContext('2d').drawImage(video, 0, 0);
 
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg'));
-    const quality = await checkPhotoQuality(blob);
-    setChecking(false);
-
-    if (!quality.passed) {
-      setError('Photo quality check failed - please retake.');
-      return;
-    }
-
-    setCapturedBlob(blob);
-    setStep(STEPS.WOUND_BOX);
+    await acceptBlob(blob, 'Photo quality check failed - please retake.');
   }
 
   // Same quality gate and step transition as a live capture - a photo picked
@@ -82,19 +107,36 @@ export default function PhotoCaptureFallback({ onCaptured }) {
     event.target.value = ''; // allow re-selecting the same file after a retake
     if (!file) return;
 
-    setChecking(true);
-    setError(null);
+    await acceptBlob(file, 'Photo quality check failed - please choose a different photo.');
+  }
 
-    const quality = await checkPhotoQuality(file);
-    setChecking(false);
+  // Fetches the list lazily (once) the first time the picker is opened, then
+  // just toggles visibility on subsequent clicks - no reason to re-hit
+  // ml-service every time.
+  async function handleToggleTestImages() {
+    setShowTestImages((prev) => !prev);
+    if (testImages !== null) return;
 
-    if (!quality.passed) {
-      setError('Photo quality check failed - please choose a different photo.');
-      return;
+    setLoadingTestImages(true);
+    try {
+      const { files } = await kioskRequest('/kiosk/test-images');
+      setTestImages(files);
+    } catch (err) {
+      setError(`Could not load test images: ${err.message}`);
+      setTestImages([]);
+    } finally {
+      setLoadingTestImages(false);
     }
+  }
 
-    setCapturedBlob(file);
-    setStep(STEPS.WOUND_BOX);
+  async function handleUseTestImage(filename) {
+    setError(null);
+    try {
+      const { imageBase64, mediaType } = await kioskRequest(`/kiosk/test-images/${encodeURIComponent(filename)}`);
+      await acceptBlob(base64ToBlob(imageBase64, mediaType), 'That test image failed the quality check.');
+    } catch (err) {
+      setError(`Could not load "${filename}": ${err.message}`);
+    }
   }
 
   function handleRetake() {
@@ -139,7 +181,29 @@ export default function PhotoCaptureFallback({ onCaptured }) {
         <MotionButton type="button" onClick={() => fileInputRef.current?.click()} disabled={checking}>
           Upload from camera roll / files
         </MotionButton>
+        {testImagesEnabled && (
+          <MotionButton type="button" onClick={handleToggleTestImages} disabled={checking}>
+            {showTestImages ? 'Hide test images' : 'Use test image'}
+          </MotionButton>
+        )}
       </div>
+
+      {testImagesEnabled && showTestImages && (
+        <div className="row" style={{ flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          {loadingTestImages && <p className="status-pill status-pill--neutral">Loading test images...</p>}
+          {!loadingTestImages && testImages?.length === 0 && (
+            <p className="status-pill status-pill--neutral">
+              No test images found - drop jpg/png files into ml-service/test-images/.
+            </p>
+          )}
+          {!loadingTestImages &&
+            testImages?.map((filename) => (
+              <MotionButton key={filename} type="button" onClick={() => handleUseTestImage(filename)}>
+                {filename}
+              </MotionButton>
+            ))}
+        </div>
+      )}
     </MotionCard>
   );
 }

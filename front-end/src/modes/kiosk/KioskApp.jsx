@@ -150,7 +150,7 @@ export default function KioskApp() {
 
         {step === STEPS.PHOTO && usingFallback && (
           <motion.div key="photo-fallback" variants={fadeUp} initial="hidden" animate="visible" exit="hidden">
-            <PhotoCaptureFallback onCaptured={handleFallbackCaptured} />
+            <PhotoCaptureFallback onCaptured={handleFallbackCaptured} testImagesEnabled />
           </motion.div>
         )}
 

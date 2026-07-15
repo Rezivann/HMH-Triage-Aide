@@ -24,6 +24,25 @@ class CvServiceClient {
     return this._post('/capture/findings', { imageRef, woundBox });
   }
 
+  // Dev-only "use a test image" flow (see kioskController's test-images
+  // routes) - ml-service 404s /test-images entirely in production (see
+  // ml-service/app/main.py), so these two calls only ever succeed locally.
+  async listTestImages() {
+    return this._get('/test-images');
+  }
+
+  async getTestImage(filename) {
+    return this._get(`/test-images/${encodeURIComponent(filename)}`);
+  }
+
+  async _get(path) {
+    const res = await fetch(`${this.baseUrl}${path}`);
+    if (!res.ok) {
+      throw new Error(`CvServiceClient ${path} failed: ${res.status} ${await res.text()}`);
+    }
+    return res.json();
+  }
+
   async _post(path, body) {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
