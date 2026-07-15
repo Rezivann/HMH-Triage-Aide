@@ -5,7 +5,7 @@ const trackController = require('../controllers/trackController');
 
 const router = express.Router();
 
-// Deliberately one thin route - see trackController.getStatus for why.
 router.get('/:sessionToken/status', trackAuth, auditLog, trackController.getStatus);
+router.post('/:sessionToken/leave', trackAuth, auditLog, trackController.leaveQueue);
 
 module.exports = router;

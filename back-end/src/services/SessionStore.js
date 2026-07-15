@@ -36,6 +36,7 @@ function toFlatSession(session, acuityScore, latestOverride) {
     status: session.status,
     messages: session.messages.map((m) => ({ role: m.role, text: m.text })),
     claimedBy: session.claimedBy,
+    telehealthViable: session.telehealthViable ?? null,
     rawScore: acuityScore?.rawScore ?? null,
     queuedAt: acuityScore?.queuedAt ?? null,
     decayCategory: acuityScore?.decayCategory ?? null,

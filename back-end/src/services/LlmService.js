@@ -34,7 +34,14 @@ const TRIAGE_SYSTEM_PROMPT =
   'would help, or "ready_no_photo" (tell the patient in your reply that you have enough ' +
   'information and are ready to proceed without a photo) if nothing here is visually ' +
   'inspectable. Until then, set status to "asking" - unless the emergency check above ' +
-  'fires, which takes priority over all of this.';
+  'fires, which takes priority over all of this.\n\n' +
+  'At every turn, also assess whether a telehealth (video call) visit could reasonably ' +
+  'substitute for this in-person visit - true for things like medication questions, ' +
+  'follow-ups, prescription refill concerns, or mild symptoms that do not need a hands-on ' +
+  'exam or in-person treatment. False for anything involving active bleeding, an open ' +
+  'wound needing care, suspected fracture/deformity, or anything already flagged ' +
+  '"emergency" - those need to be seen in person. Set telehealthViable accordingly on ' +
+  'every turn, even while still "asking" (your best guess so far, refined as you learn more).';
 
 const INTAKE_TOOL = {
   name: 'submit_intake_turn',
@@ -64,8 +71,14 @@ const INTAKE_TOOL = {
           'every other status, even mid-conversation with no further questions asked, and ' +
           'skips any photo entirely.',
       },
+      telehealthViable: {
+        type: 'boolean',
+        description:
+          'Whether a telehealth (video call) visit could reasonably substitute for seeing ' +
+          'this patient in person, based on what they have said so far.',
+      },
     },
-    required: ['reply', 'status'],
+    required: ['reply', 'status', 'telehealthViable'],
   },
 };
 
@@ -93,10 +106,10 @@ class LlmService {
     this.apiVersion = apiVersion;
   }
 
-  // Returns { reply, status }, status one of 'asking' | 'ready_for_photo' |
-  // 'ready_no_photo'. Forced tool-use (not free-text) so this is structured
-  // rather than parsed out of prose - same pattern synthesizeAcuity/
-  // classify_findings already use.
+  // Returns { reply, status, telehealthViable }, status one of 'asking' |
+  // 'ready_for_photo' | 'ready_no_photo' | 'emergency'. Forced tool-use (not
+  // free-text) so this is structured rather than parsed out of prose - same
+  // pattern synthesizeAcuity/classify_findings already use.
   async sendMessage(session, message) {
     this._assertConfigured();
     const messages = [

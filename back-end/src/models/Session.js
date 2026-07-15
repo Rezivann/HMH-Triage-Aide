@@ -14,11 +14,15 @@ const sessionSchema = new mongoose.Schema(
     locationId: { type: String, required: true, index: true },
     status: {
       type: String,
-      enum: ['in_intake', 'queued', 'claimed', 'closed', 'force_escalated'],
+      enum: ['in_intake', 'queued', 'claimed', 'closed', 'force_escalated', 'left_queue'],
       default: 'in_intake',
     },
     messages: { type: [messageSchema], default: [] },
     claimedBy: { type: String, default: null },
+    // Set from LlmService.sendMessage's per-turn judgment (kioskController.
+    // postMessage) - exposed on the patient's own track page (trackController.
+    // getStatus). Null until the first conversation turn runs.
+    telehealthViable: { type: Boolean, default: null },
   },
   { timestamps: true }
 );

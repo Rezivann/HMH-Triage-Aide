@@ -5,18 +5,20 @@ const COPY = {
   waiting: "You're in the queue. We'll let you know as your turn approaches.",
   next: "You're next.",
   with_nurse: 'A nurse is with you now.',
+  left_queue: "You've left the queue.",
 };
 
 const BANNER_VARIANT = {
   waiting: 'status-banner--neutral',
   next: 'status-banner--accent',
   with_nurse: 'status-banner--success',
+  left_queue: 'status-banner--neutral',
 };
 
 // Shows this patient's own queue position - never a score, findings, or any
 // other patient's data (the backend enforces that boundary too; see
 // trackController.js).
-export default function StatusBand({ status, position }) {
+export default function StatusBand({ status, position, estimatedWaitMinutes }) {
   if (!status)
     return (
       <MotionCard>
@@ -55,9 +57,16 @@ export default function StatusBand({ status, position }) {
           </AnimatePresence>
         </p>
       )}
-      <p style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>
-        Your position may shift as other patients' medical urgency is assessed.
-      </p>
+      {estimatedWaitMinutes != null && (
+        <p className="tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+          Approximate wait: ~{estimatedWaitMinutes} minute{estimatedWaitMinutes === 1 ? '' : 's'}
+        </p>
+      )}
+      {status !== 'left_queue' && (
+        <p style={{ color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}>
+          Your position may shift as other patients' medical urgency is assessed.
+        </p>
+      )}
     </MotionCard>
   );
 }

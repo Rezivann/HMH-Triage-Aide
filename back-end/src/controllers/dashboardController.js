@@ -55,7 +55,7 @@ function getAcuityPolicy(req, res) {
 // audited the same way an override is, since it changes how every future
 // (and every currently-queued) patient's score is computed.
 function updateAcuityPolicy(req, res) {
-  const { categories, adjustmentRange, emergencyScoreThreshold, note } = req.body;
+  const { categories, adjustmentRange, emergencyScoreThreshold, minutesPerQueuePosition, note } = req.body;
   const { nurseId } = req.nurse;
 
   if (!note) {
@@ -70,8 +70,21 @@ function updateAcuityPolicy(req, res) {
   ) {
     return res.status(400).json({ error: 'invalid_emergency_score_threshold' });
   }
+  if (
+    minutesPerQueuePosition !== undefined &&
+    (typeof minutesPerQueuePosition !== 'number' || minutesPerQueuePosition <= 0)
+  ) {
+    return res.status(400).json({ error: 'invalid_minutes_per_queue_position' });
+  }
 
-  const updated = acuityPolicyStore.updatePolicy({ categories, adjustmentRange, emergencyScoreThreshold, nurseId, note });
+  const updated = acuityPolicyStore.updatePolicy({
+    categories,
+    adjustmentRange,
+    emergencyScoreThreshold,
+    minutesPerQueuePosition,
+    nurseId,
+    note,
+  });
   res.json(updated);
 }
 

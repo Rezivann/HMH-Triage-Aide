@@ -33,6 +33,11 @@ const DEFAULT_POLICY = {
   // escalation (gunshot/DV/pediatric-high-risk), which always fires
   // regardless of this number.
   emergencyScoreThreshold: 700,
+  // Nurse-tunable estimate shown on the patient's own track page
+  // (trackController.getStatus) - estimatedWaitMinutes is just position *
+  // this number. A rough average, not a per-category estimate - deliberately
+  // simple for the demo rather than modeling per-patient treatment time.
+  minutesPerQueuePosition: 3,
   categories: {
     // Uncontrolled active bleeding can be fatal within roughly 30 minutes
     // without intervention (trauma "golden hour" reasoning) - ceiling
@@ -194,6 +199,7 @@ function getPolicy() {
   return {
     adjustmentRange: policy.adjustmentRange,
     emergencyScoreThreshold: policy.emergencyScoreThreshold,
+    minutesPerQueuePosition: policy.minutesPerQueuePosition,
     categories: policy.categories,
     lastChanged,
   };
@@ -214,7 +220,14 @@ function getCategory(key) {
 
 // Only patches keys that already exist - a typo'd or unknown category key
 // is silently ignored rather than creating a new, unlabeled category.
-function updatePolicy({ categories, adjustmentRange, emergencyScoreThreshold, nurseId, note }) {
+function updatePolicy({
+  categories,
+  adjustmentRange,
+  emergencyScoreThreshold,
+  minutesPerQueuePosition,
+  nurseId,
+  note,
+}) {
   if (categories) {
     Object.entries(categories).forEach(([key, patch]) => {
       if (!policy.categories[key]) return;
@@ -226,6 +239,9 @@ function updatePolicy({ categories, adjustmentRange, emergencyScoreThreshold, nu
   }
   if (typeof emergencyScoreThreshold === 'number') {
     policy.emergencyScoreThreshold = emergencyScoreThreshold;
+  }
+  if (typeof minutesPerQueuePosition === 'number') {
+    policy.minutesPerQueuePosition = minutesPerQueuePosition;
   }
   lastChanged = { nurseId, note, at: new Date().toISOString() };
   return getPolicy();

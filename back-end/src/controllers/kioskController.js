@@ -58,7 +58,7 @@ async function postMessage(req, res) {
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   try {
-    const { reply, status: intakeStatus } = await llmService.sendMessage(session, message);
+    const { reply, status: intakeStatus, telehealthViable } = await llmService.sendMessage(session, message);
     const messages = [...session.messages, { role: 'patient', text: message }, { role: 'assistant', text: reply }];
 
     // A high-risk/life-threatening description short-circuits the rest of
@@ -68,10 +68,11 @@ async function postMessage(req, res) {
     const escalated = intakeStatus === 'emergency';
     const updated = await store.updateSession(sessionId, {
       messages,
+      telehealthViable,
       ...(escalated ? { status: 'force_escalated', queuedAt: new Date().toISOString() } : {}),
     });
 
-    res.json({ reply, intakeStatus, messages: updated.messages, escalated });
+    res.json({ reply, intakeStatus, messages: updated.messages, escalated, telehealthViable: updated.telehealthViable });
   } catch (err) {
     res.status(502).json({ error: 'llm_request_failed', message: err.message });
   }

@@ -37,6 +37,7 @@ export default function AcuityPolicyPanel() {
         categories: policy.categories,
         adjustmentRange: policy.adjustmentRange,
         emergencyScoreThreshold: policy.emergencyScoreThreshold,
+        minutesPerQueuePosition: policy.minutesPerQueuePosition,
       });
     }
   }, [policy]);
@@ -68,6 +69,7 @@ export default function AcuityPolicyPanel() {
         categories: draft.categories,
         adjustmentRange: draft.adjustmentRange,
         emergencyScoreThreshold: draft.emergencyScoreThreshold,
+        minutesPerQueuePosition: draft.minutesPerQueuePosition,
         note,
       });
       setNote('');
@@ -186,6 +188,24 @@ export default function AcuityPolicyPanel() {
         A session whose score reaches this - at intake or after decay - skips the queue and sends the patient
         straight to the front desk. Categories/times above this threshold are outlined in red and tagged
         "Emergency".
+      </p>
+
+      <label>
+        Minutes per queue position (patient wait estimate)
+        <input
+          type="number"
+          min="0.1"
+          step="0.1"
+          value={draft.minutesPerQueuePosition}
+          onChange={(event) =>
+            setDraft((prev) => ({ ...prev, minutesPerQueuePosition: Number(event.target.value) }))
+          }
+          style={{ width: '6rem' }}
+        />
+      </label>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+        Shown to patients on their own track page as "approximately N minutes" - just position times this
+        number, not a per-category estimate.
       </p>
 
       <div className="row">
