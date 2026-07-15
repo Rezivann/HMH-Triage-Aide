@@ -19,10 +19,10 @@ export function useAcuityPolicy() {
     refetch();
   }, [refetch]);
 
-  const save = useCallback(async ({ categories, adjustmentRange, note }) => {
+  const save = useCallback(async ({ categories, adjustmentRange, emergencyScoreThreshold, note }) => {
     const updated = await dashboardRequest('/dashboard/acuity-policy', {
       method: 'PUT',
-      body: { categories, adjustmentRange, note },
+      body: { categories, adjustmentRange, emergencyScoreThreshold, note },
     });
     setPolicy(updated);
     return updated;

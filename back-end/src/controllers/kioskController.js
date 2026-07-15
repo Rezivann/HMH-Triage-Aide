@@ -120,7 +120,7 @@ async function postRealPhoto(req, res, session, { imageBase64, woundBox }) {
 
   const acuity = await llmService.synthesizeAcuity(narrative, findings.findings);
 
-  if (isCriticalScore(acuity.rawScore)) {
+  if (isCriticalScore(acuity.rawScore, acuityPolicyStore.getPolicy().emergencyScoreThreshold)) {
     return res.status(202).json({
       session: await escalateForCriticalScore(session.sessionId, acuity, cvRecord),
       cv: findings,
@@ -209,7 +209,7 @@ async function postNoPhoto(req, res) {
       findingsAgreement: true,
     };
 
-    if (isCriticalScore(acuity.rawScore)) {
+    if (isCriticalScore(acuity.rawScore, acuityPolicyStore.getPolicy().emergencyScoreThreshold)) {
       return res.status(202).json({
         session: await escalateForCriticalScore(sessionId, acuity, {}),
         cv: null,

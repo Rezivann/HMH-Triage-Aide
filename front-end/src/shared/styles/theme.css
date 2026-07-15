@@ -502,6 +502,28 @@ video {
   border-color: var(--color-warning);
 }
 
+.badge--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.spinner {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 3px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+}
+
+/* AcuityPolicyPanel - marks a baseline/projected-score input or cell that has
+   reached the nurse-tunable emergency threshold, so the effect of a policy
+   edit is visible in the table itself, not just in the number. */
+.field--danger {
+  border-color: var(--color-danger) !important;
+  box-shadow: 0 0 0 1px var(--color-danger);
+}
+
 /* Decorative gradient layer for hero sections (HomeApp) - built from the
    existing --color-accent, not a new color. Positioned behind content via a
    negative-margin wrapper rather than a fixed/absolute overlay, so it scrolls

@@ -17,11 +17,15 @@ function forceEscalate(findings) {
 // itself rather than a categorical hardFlag, since a presentation can be
 // critical without tripping any of the fixed hardFlag categories (e.g.
 // severe chest pain described purely verbally, no photo at all). Same
-// 0-1000 scale as utils/queueSort.js.
-const CRITICAL_SCORE_THRESHOLD = 700;
+// 0-1000 scale as utils/queueSort.js. threshold is nurse-tunable (see
+// fakeAcuityPolicyStore's emergencyScoreThreshold) - callers must pass the
+// current policy value in, since this module stays a pure function with no
+// store import of its own. DEFAULT_CRITICAL_SCORE_THRESHOLD only exists as
+// the fallback fakeAcuityPolicyStore.js seeds itself with.
+const DEFAULT_CRITICAL_SCORE_THRESHOLD = 700;
 
-function isCriticalScore(rawScore) {
-  return typeof rawScore === 'number' && rawScore >= CRITICAL_SCORE_THRESHOLD;
+function isCriticalScore(rawScore, threshold = DEFAULT_CRITICAL_SCORE_THRESHOLD) {
+  return typeof rawScore === 'number' && typeof threshold === 'number' && rawScore >= threshold;
 }
 
 // Guarantees a top-10% queue slot (see utils/queueSort.js computeAutoFloor)
@@ -59,5 +63,5 @@ module.exports = {
   evaluateAutoFloor,
   HARD_FLAG_CATEGORIES,
   LOW_CONFIDENCE_THRESHOLD,
-  CRITICAL_SCORE_THRESHOLD,
+  DEFAULT_CRITICAL_SCORE_THRESHOLD,
 };

@@ -32,7 +32,13 @@ export default function AcuityPolicyPanel() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (policy) setDraft({ categories: policy.categories, adjustmentRange: policy.adjustmentRange });
+    if (policy) {
+      setDraft({
+        categories: policy.categories,
+        adjustmentRange: policy.adjustmentRange,
+        emergencyScoreThreshold: policy.emergencyScoreThreshold,
+      });
+    }
   }, [policy]);
 
   if (error) return <p role="alert">{error.message}</p>;
@@ -58,7 +64,12 @@ export default function AcuityPolicyPanel() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await save({ categories: draft.categories, adjustmentRange: draft.adjustmentRange, note });
+      await save({
+        categories: draft.categories,
+        adjustmentRange: draft.adjustmentRange,
+        emergencyScoreThreshold: draft.emergencyScoreThreshold,
+        note,
+      });
       setNote('');
     } catch (err) {
       setSubmitError(err.message);
@@ -92,41 +103,57 @@ export default function AcuityPolicyPanel() {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(draft.categories).map(([key, category]) => (
-              <tr key={key}>
-                <td>{category.label}</td>
-                <td>
-                  <input
-                    type="number"
-                    value={category.baselineScore}
-                    onChange={(event) => updateCategory(key, 'baselineScore', event.target.value)}
-                    style={{ width: '5rem' }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={category.decayWeightPerMinute}
-                    onChange={(event) => updateCategory(key, 'decayWeightPerMinute', event.target.value)}
-                    style={{ width: '5rem' }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    value={category.decayCap}
-                    onChange={(event) => updateCategory(key, 'decayCap', event.target.value)}
-                    style={{ width: '5rem' }}
-                  />
-                </td>
-                {PROJECTION_MINUTES.map((minutes) => (
-                  <td key={minutes} className="tabular-nums">
-                    {Math.round(projectScore(category, minutes))}
+            {Object.entries(draft.categories).map(([key, category]) => {
+              const threshold = draft.emergencyScoreThreshold;
+              const baselinePastThreshold = category.baselineScore >= threshold;
+              const projections = PROJECTION_MINUTES.map((minutes) => projectScore(category, minutes));
+              const anyPastThreshold = baselinePastThreshold || projections.some((score) => score >= threshold);
+
+              return (
+                <tr key={key}>
+                  <td>
+                    <span className="row" style={{ gap: 'var(--space-2)', flexWrap: 'nowrap' }}>
+                      {category.label}
+                      {anyPastThreshold && <span className="badge badge--danger">Emergency</span>}
+                    </span>
                   </td>
-                ))}
-              </tr>
-            ))}
+                  <td>
+                    <input
+                      type="number"
+                      value={category.baselineScore}
+                      onChange={(event) => updateCategory(key, 'baselineScore', event.target.value)}
+                      className={baselinePastThreshold ? 'field--danger' : undefined}
+                      style={{ width: '5rem' }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={category.decayWeightPerMinute}
+                      onChange={(event) => updateCategory(key, 'decayWeightPerMinute', event.target.value)}
+                      style={{ width: '5rem' }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      value={category.decayCap}
+                      onChange={(event) => updateCategory(key, 'decayCap', event.target.value)}
+                      style={{ width: '5rem' }}
+                    />
+                  </td>
+                  {PROJECTION_MINUTES.map((minutes, index) => (
+                    <td
+                      key={minutes}
+                      className={`tabular-nums${projections[index] >= threshold ? ' field--danger' : ''}`}
+                    >
+                      {Math.round(projections[index])}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -141,6 +168,25 @@ export default function AcuityPolicyPanel() {
           style={{ width: '6rem' }}
         />
       </label>
+
+      <label>
+        Emergency score threshold (0-{MAX_SCORE})
+        <input
+          type="number"
+          min="0"
+          max={MAX_SCORE}
+          value={draft.emergencyScoreThreshold}
+          onChange={(event) =>
+            setDraft((prev) => ({ ...prev, emergencyScoreThreshold: Number(event.target.value) }))
+          }
+          style={{ width: '6rem' }}
+        />
+      </label>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+        A session whose score reaches this - at intake or after decay - skips the queue and sends the patient
+        straight to the front desk. Categories/times above this threshold are outlined in red and tagged
+        "Emergency".
+      </p>
 
       <div className="row">
         <input

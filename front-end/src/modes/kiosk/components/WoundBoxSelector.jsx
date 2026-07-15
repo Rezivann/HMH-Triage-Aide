@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
+import Spinner from '../../../shared/components/Spinner';
 
 // Shown right after capture, before the photo is submitted - the only
 // box-draw step now (no nail-box step; this pipeline no longer estimates
@@ -126,18 +127,20 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
 
       {error && <p role="alert">{error}</p>}
 
-      <div className="row">
+      <div className="row" style={{ alignItems: 'center' }}>
         <MotionButton type="button" onClick={onRetake} disabled={submitting}>
           Retake photo
         </MotionButton>
-        <MotionButton
-          type="button"
-          className="btn-primary"
-          onClick={handleConfirm}
-          disabled={!hasValidBox || submitting}
-        >
-          {submitting ? 'Submitting...' : 'Confirm wound area'}
-        </MotionButton>
+        {submitting ? (
+          <span className="row" style={{ alignItems: 'center', gap: 'var(--space-2)' }}>
+            <Spinner />
+            Analyzing photo...
+          </span>
+        ) : (
+          <MotionButton type="button" className="btn-primary" onClick={handleConfirm} disabled={!hasValidBox}>
+            Confirm wound area
+          </MotionButton>
+        )}
       </div>
     </MotionCard>
   );

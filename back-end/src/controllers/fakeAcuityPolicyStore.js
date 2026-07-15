@@ -26,6 +26,13 @@
 // nudge, never baselineScore/decayWeightPerMinute/decayCap themselves.
 const DEFAULT_POLICY = {
   adjustmentRange: 100,
+  // Nurse-tunable version of ReviewRoutingService's force-escalate score
+  // check - a session whose synthesized rawScore reaches this (from either
+  // the photo or no-photo path) skips the queue entirely and force-escalates
+  // the patient to the front desk. Independent of the categorical hardFlag
+  // escalation (gunshot/DV/pediatric-high-risk), which always fires
+  // regardless of this number.
+  emergencyScoreThreshold: 700,
   categories: {
     // Uncontrolled active bleeding can be fatal within roughly 30 minutes
     // without intervention (trauma "golden hour" reasoning) - ceiling
@@ -117,7 +124,12 @@ let policy = JSON.parse(JSON.stringify(DEFAULT_POLICY));
 let lastChanged = null;
 
 function getPolicy() {
-  return { adjustmentRange: policy.adjustmentRange, categories: policy.categories, lastChanged };
+  return {
+    adjustmentRange: policy.adjustmentRange,
+    emergencyScoreThreshold: policy.emergencyScoreThreshold,
+    categories: policy.categories,
+    lastChanged,
+  };
 }
 
 // Plain { categoryKey: { rate, cap } } map - kept separate from the full
@@ -135,7 +147,7 @@ function getCategory(key) {
 
 // Only patches keys that already exist - a typo'd or unknown category key
 // is silently ignored rather than creating a new, unlabeled category.
-function updatePolicy({ categories, adjustmentRange, nurseId, note }) {
+function updatePolicy({ categories, adjustmentRange, emergencyScoreThreshold, nurseId, note }) {
   if (categories) {
     Object.entries(categories).forEach(([key, patch]) => {
       if (!policy.categories[key]) return;
@@ -144,6 +156,9 @@ function updatePolicy({ categories, adjustmentRange, nurseId, note }) {
   }
   if (typeof adjustmentRange === 'number') {
     policy.adjustmentRange = adjustmentRange;
+  }
+  if (typeof emergencyScoreThreshold === 'number') {
+    policy.emergencyScoreThreshold = emergencyScoreThreshold;
   }
   lastChanged = { nurseId, note, at: new Date().toISOString() };
   return getPolicy();
