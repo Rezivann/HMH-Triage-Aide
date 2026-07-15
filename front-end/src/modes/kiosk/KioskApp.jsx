@@ -76,7 +76,7 @@ export default function KioskApp() {
     return (
       <PageShell>
         <motion.h1 variants={fadeUp} initial="hidden" animate="visible">
-          LLMTriage
+          HMH Triage Aide
         </motion.h1>
         <KioskLanding onStart={() => setLanded(true)} />
       </PageShell>
@@ -121,7 +121,7 @@ export default function KioskApp() {
   return (
     <PageShell>
       <motion.h1 variants={fadeUp} initial="hidden" animate="visible">
-        LLMTriage
+        HMH Triage Aide
       </motion.h1>
 
       <AnimatePresence mode="wait">

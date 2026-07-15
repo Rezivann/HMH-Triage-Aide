@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:4000';
-const NURSE_TOKEN_STORAGE_KEY = 'llmtriage.nurseToken';
+const NURSE_TOKEN_STORAGE_KEY = 'hmhtriageaide.nurseToken';
 
 async function request(path, { method = 'GET', headers = {}, body, authHeader } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {

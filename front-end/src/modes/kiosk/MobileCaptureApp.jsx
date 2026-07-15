@@ -62,7 +62,7 @@ export default function MobileCaptureApp() {
 
   return (
     <PageShell>
-      <h1>LLMTriage</h1>
+      <h1>HMH Triage Aide</h1>
       {error && <p role="alert">{describePhotoSubmitError(error)}</p>}
       <PhotoCaptureFallback onCaptured={handleCaptured} />
     </PageShell>

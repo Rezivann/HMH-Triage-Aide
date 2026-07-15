@@ -24,7 +24,7 @@ export default function HomeApp() {
   return (
     <PageShell className="hero-glow">
       <motion.div variants={fadeUp} initial="hidden" animate="visible" style={{ textAlign: 'center' }}>
-        <h1 className="hero-heading">LLMTriage</h1>
+        <h1 className="hero-heading">HMH Triage Aide</h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-lg)', maxWidth: '30rem', margin: '0 auto' }}>
           AI-assisted intake and acuity triage - pick where you're starting from.
         </p>

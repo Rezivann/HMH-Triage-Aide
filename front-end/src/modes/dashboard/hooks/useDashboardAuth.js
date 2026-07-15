@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { request, BASE_URL, NURSE_TOKEN_STORAGE_KEY } from '../../../shared/api/apiClient';
 
-const NURSE_ID_STORAGE_KEY = 'llmtriage.nurseId';
+const NURSE_ID_STORAGE_KEY = 'hmhtriageaide.nurseId';
 
 // Dev login stub calling the backend's dev-only /dashboard/dev-login route.
 // Real Duo SSO replaces the body of login() with a redirect later; nothing
