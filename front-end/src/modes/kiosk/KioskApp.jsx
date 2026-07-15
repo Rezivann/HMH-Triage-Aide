@@ -157,6 +157,14 @@ export default function KioskApp() {
         {step === STEPS.END && (
           <motion.div key="end" variants={fadeUp} initial="hidden" animate="visible" exit="hidden">
             {escalated ? <CriticalAlert /> : <EndScreen sessionId={sessionId} trackUrl={trackUrl} />}
+            {/* Full reload (not client-side navigation) - this kiosk needs a
+                genuinely fresh session for the next patient, not just the
+                landing screen shown again over this same patient's stale
+                session/messages/tokens still sitting in useKioskSession's
+                state. */}
+            <MotionButton type="button" onClick={() => window.location.assign('/kiosk')}>
+              Back to Home
+            </MotionButton>
           </motion.div>
         )}
       </AnimatePresence>
