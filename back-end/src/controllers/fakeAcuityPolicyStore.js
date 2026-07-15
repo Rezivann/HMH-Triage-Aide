@@ -77,6 +77,39 @@ const DEFAULT_POLICY = {
       decayWeightPerMinute: 0.06,
       decayCap: 30,
     },
+    // Burns: one category spans a huge range (1st-degree sunburn to
+    // full-thickness) - findings.stage (see vision_llm_client.py's staging
+    // note) and Claude's narrative-based adjustment are what separate a
+    // minor burn from a severe one, not a second category. Infection and
+    // fluid-loss risk build over hours untreated - ceiling 400+300=700 over
+    // 180 min (3h) -> 300/180.
+    burn: {
+      label: 'Burn',
+      baselineScore: 400,
+      decayWeightPerMinute: 1.67,
+      decayCap: 300,
+    },
+    // Puncture wounds (nails, bites, needles): often look minor on the
+    // surface but drive bacteria deep, so infection risk is higher than the
+    // visible wound suggests - moderate baseline, builds over about a day -
+    // ceiling 200+100=300 over 360 min (6h) -> 100/360.
+    puncture_wound: {
+      label: 'Puncture wound',
+      baselineScore: 200,
+      decayWeightPerMinute: 0.28,
+      decayCap: 100,
+    },
+    // Pressure ulcers/bedsores: a chronic wound - the accumulated harm
+    // already happened over weeks, so an extra hour in the ED waiting room
+    // doesn't spike risk the way an acute wound's would. Slow decay, but a
+    // meaningful baseline since advanced stages carry real sepsis risk -
+    // ceiling 300+100=400 over 480 min (8h) -> 100/480.
+    pressure_ulcer: {
+      label: 'Pressure ulcer',
+      baselineScore: 300,
+      decayWeightPerMinute: 0.21,
+      decayCap: 100,
+    },
     // Fallback for sessions with no decayCategory assigned yet (e.g. the
     // kiosk's current fake CV result). Erring cautious since the true
     // severity is unknown - ceiling 250 + 250 = 500 over 120 min (2h) ->
@@ -116,6 +149,40 @@ const DEFAULT_POLICY = {
       baselineScore: 120,
       decayWeightPerMinute: 0.14,
       decayCap: 50,
+    },
+    // Head injury / possible concussion: the classic risk here is a
+    // symptom (e.g. intracranial bleeding) that isn't apparent yet from the
+    // conversation alone and worsens over the following hours - cautious
+    // baseline and fast decay, similar profile to unclassified - ceiling
+    // 450+250=700 over 120 min (2h) -> 250/120.
+    head_injury: {
+      label: 'Head injury / possible concussion',
+      baselineScore: 450,
+      decayWeightPerMinute: 2.08,
+      decayCap: 250,
+    },
+    // Allergic reaction - severe/anaphylactic reactions never reach this
+    // category at all (LlmService's TRIAGE_SYSTEM_PROMPT routes those
+    // straight to "emergency" mid-conversation, bypassing acuity scoring
+    // entirely - see kioskController.postMessage). This covers the milder
+    // reactions (hives, localized swelling) that still warrant faster
+    // decay than baseline alone suggests, since these can escalate
+    // unpredictably - ceiling 350+200=550 over 60 min (1h) -> 200/60.
+    allergic_reaction: {
+      label: 'Allergic reaction',
+      baselineScore: 350,
+      decayWeightPerMinute: 3.33,
+      decayCap: 200,
+    },
+    // Fever / signs of infection - usually not acutely dangerous, but can
+    // be the first sign of something serious (e.g. sepsis) developing -
+    // moderate baseline and decay over several hours - ceiling
+    // 250+150=400 over 240 min (4h) -> 150/240.
+    fever_infection: {
+      label: 'Fever / signs of infection',
+      baselineScore: 250,
+      decayWeightPerMinute: 0.625,
+      decayCap: 150,
     },
   },
 };
