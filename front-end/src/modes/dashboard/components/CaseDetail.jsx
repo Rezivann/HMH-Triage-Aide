@@ -27,10 +27,23 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
 
   return (
     <motion.div className="card" variants={fadeUp} initial="hidden" animate="visible" exit="hidden">
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <h2 className="tabular-nums" style={{ margin: 0 }}>
-          {session.sessionId}
-        </h2>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 className="tabular-nums" style={{ margin: 0 }}>
+            {session.displayId || session.sessionId}
+          </h2>
+          {/* Raw ObjectId stays visible (just de-emphasized) once a displayId
+              exists - still the identifier that matches backend logs/audit
+              trails, even though it's no longer the headline. */}
+          {session.displayId && (
+            <p
+              className="tabular-nums"
+              style={{ margin: 0, color: 'var(--color-text-faint)', fontSize: 'var(--text-sm)' }}
+            >
+              {session.sessionId}
+            </p>
+          )}
+        </div>
         <MotionButton type="button" onClick={onClose}>
           Close
         </MotionButton>

@@ -23,6 +23,17 @@ const sessionSchema = new mongoose.Schema(
     // postMessage) - exposed on the patient's own track page (trackController.
     // getStatus). Null until the first conversation turn runs.
     telehealthViable: { type: Boolean, default: null },
+    // Parsed by the LLM from its mandatory first question (LlmService.js) -
+    // null until asked and answered. displayId is derived from these the
+    // first time both are non-null (see kioskController.postMessage) and
+    // never recomputed after that, even if these somehow changed later.
+    patientFirstName: { type: String, default: null },
+    patientLastInitial: { type: String, default: null },
+    // Human-readable stand-in for sessionId on the nurse dashboard - e.g.
+    // "IvanR_0001", the trailing number only incrementing when an existing
+    // session already has that same first-name+last-initial pair (see
+    // kioskController.buildDisplayId). Assigned once, permanently.
+    displayId: { type: String, default: null },
   },
   { timestamps: true }
 );

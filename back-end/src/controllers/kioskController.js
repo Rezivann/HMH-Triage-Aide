@@ -28,6 +28,31 @@ async function escalateForCriticalScore(sessionId, acuity, extraFields) {
     ...extraFields,
   });
 }
+
+// Human-readable stand-in for a session's Mongo ObjectId on the nurse
+// dashboard - e.g. "IvanR_0001". The trailing number only increments when an
+// existing session already has this exact first-name+last-initial pair
+// (case-insensitive) and already has a displayId of its own - a brand new
+// name always starts at 0001. This is a plain count-then-assign, not
+// race-safe under two same-name patients checking in at literally the same
+// instant - an acceptable gap for a demo-scale kiosk, same spirit as
+// fakeAcuityPolicyStore's own "not production-hardened" framing.
+async function buildDisplayId(firstName, lastInitial) {
+  const first = firstName.trim();
+  const capitalizedFirst = first.charAt(0).toUpperCase() + first.slice(1);
+  const lastInitialUpper = lastInitial.trim().charAt(0).toUpperCase();
+
+  const allSessions = await store.listSessions({});
+  const existingCount = allSessions.filter(
+    (s) =>
+      s.displayId &&
+      (s.patientFirstName || '').toLowerCase() === first.toLowerCase() &&
+      (s.patientLastInitial || '').toUpperCase() === lastInitialUpper
+  ).length;
+
+  const number = String(existingCount + 1).padStart(4, '0');
+  return `${capitalizedFirst}${lastInitialUpper}_${number}`;
+}
 const { trackTokenSecret, photoTokenSecret } = require('../config/env');
 
 const cvServiceClient = new CvServiceClient();
@@ -58,8 +83,22 @@ async function postMessage(req, res) {
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
   try {
-    const { reply, status: intakeStatus, telehealthViable } = await llmService.sendMessage(session, message);
+    const {
+      reply,
+      status: intakeStatus,
+      telehealthViable,
+      patientFirstName,
+      patientLastInitial,
+    } = await llmService.sendMessage(session, message);
     const messages = [...session.messages, { role: 'patient', text: message }, { role: 'assistant', text: reply }];
+
+    // Assigned once, the first turn both name fields come back non-empty -
+    // never recomputed after that, so a later turn that somehow re-parses a
+    // slightly different name never reassigns it or bumps the counter again.
+    let displayId = session.displayId;
+    if (!displayId && patientFirstName && patientLastInitial) {
+      displayId = await buildDisplayId(patientFirstName, patientLastInitial);
+    }
 
     // A high-risk/life-threatening description short-circuits the rest of
     // intake right here - no photo, no acuity synthesis, no queue. The
@@ -69,6 +108,12 @@ async function postMessage(req, res) {
     const updated = await store.updateSession(sessionId, {
       messages,
       telehealthViable,
+      // Falls back to whatever was already stored rather than the model's
+      // (expected-null-only-before-capture) output, so a later turn can
+      // never erase an already-captured name.
+      patientFirstName: patientFirstName ?? session.patientFirstName,
+      patientLastInitial: patientLastInitial ?? session.patientLastInitial,
+      displayId,
       ...(escalated ? { status: 'force_escalated', queuedAt: new Date().toISOString() } : {}),
     });
 

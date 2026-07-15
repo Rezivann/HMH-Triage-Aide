@@ -21,7 +21,7 @@ export default function QueueList({ queue, onSelect }) {
       <thead>
         <tr>
           <th>#</th>
-          <th>Session</th>
+          <th>Patient</th>
           <th>Score</th>
           <th>Override</th>
           <th></th>
@@ -44,7 +44,11 @@ export default function QueueList({ queue, onSelect }) {
               whileHover={{ backgroundColor: 'var(--color-surface-2)' }}
             >
               <td className="tabular-nums">{session.position}</td>
-              <td className="tabular-nums">{session.sessionId}</td>
+              {/* displayId ("IvanR_0001" - see kioskController.buildDisplayId) is
+                  the norm; sessionId is a fallback for sessions that never
+                  captured a name (e.g. emergency-escalated before the LLM's
+                  first question, or a fake/dev-only submission). */}
+              <td className="tabular-nums">{session.displayId || session.sessionId}</td>
               <td className="tabular-nums">{session.effectiveScore?.toFixed(1)}</td>
               <td>
                 {session.override && (

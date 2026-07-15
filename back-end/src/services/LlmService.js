@@ -29,12 +29,23 @@ const TRIAGE_SYSTEM_PROMPT =
   'regardless of how visually inspectable the issue there is. Always set status to ' +
   '"ready_no_photo" for these, and rely on the patient\'s verbal description alone; this is ' +
   'for patient privacy and dignity, not a judgment about clinical usefulness.\n\n' +
-  'Once you have enough context, stop asking questions and set status to "ready_for_photo" ' +
-  '(tell the patient in your reply that you are ready to take a look at a photo) if a photo ' +
-  'would help, or "ready_no_photo" (tell the patient in your reply that you have enough ' +
-  'information and are ready to proceed without a photo) if nothing here is visually ' +
-  'inspectable. Until then, set status to "asking" - unless the emergency check above ' +
-  'fires, which takes priority over all of this.\n\n' +
+  'Once you have gathered enough clinical context, do not move to "ready_for_photo" or ' +
+  '"ready_no_photo" yet if you do not already have the patient\'s name (patientFirstName/ ' +
+  'patientLastInitial both still null) - first, in that same reply, briefly acknowledge ' +
+  'you have what you need and ask for their first name and the first letter of their last ' +
+  'name (e.g. "Ivan R.") as the true last question, keeping status "asking" for this turn. ' +
+  'Asking for the name last (not first) means a genuine emergency is never delayed behind ' +
+  'a name question, and lets the patient read your clinical wrap-up at their own pace while ' +
+  'they answer, rather than a name Q&A pushing that message later. Once given, parse out ' +
+  'patientFirstName and patientLastInitial (a single capitalized letter) - this does not ' +
+  'count toward the question budget above. Only once you have both the clinical context ' +
+  'AND the name should you actually set status to "ready_for_photo" (tell the patient in ' +
+  'your reply that you are ready to take a look at a photo) if a photo would help, or ' +
+  '"ready_no_photo" (tell the patient in your reply that you have enough information and ' +
+  'are ready to proceed without a photo) if nothing here is visually inspectable. Until ' +
+  'both conditions hold, set status to "asking" - unless the emergency check above fires, ' +
+  'which takes priority over all of this (and over the name question - never ask for a ' +
+  'name before flagging an emergency).\n\n' +
   'At every turn, also assess whether a telehealth (video call) visit could reasonably ' +
   'substitute for this in-person visit - true for things like medication questions, ' +
   'follow-ups, prescription refill concerns, or mild symptoms that do not need a hands-on ' +
@@ -61,15 +72,19 @@ const INTAKE_TOOL = {
         type: 'string',
         enum: ['asking', 'ready_for_photo', 'ready_no_photo', 'emergency'],
         description:
-          '"asking" to keep gathering context with one more question. "ready_for_photo" ' +
-          'once enough context is gathered AND this presentation has something visually ' +
+          '"asking" to keep gathering context with one more question, INCLUDING while you ' +
+          'have enough clinical context but still need to ask for the patient\'s name (the ' +
+          'true last question) - never set a "ready_*" status with patientFirstName/ ' +
+          'patientLastInitial still null. "ready_for_photo" once you have both enough ' +
+          'context AND the patient\'s name, AND this presentation has something visually ' +
           'inspectable a photo would help with, AND that is not on a private body area ' +
-          '(genitals, breasts, buttocks). "ready_no_photo" once enough context is gathered ' +
-          'AND either this presentation is purely internal with nothing a photo could show, ' +
-          'or it involves a private body area. "emergency" the moment the patient describes ' +
-          'a very high-risk, potentially life-threatening presentation - takes priority over ' +
-          'every other status, even mid-conversation with no further questions asked, and ' +
-          'skips any photo entirely.',
+          '(genitals, breasts, buttocks). "ready_no_photo" once you have both enough context ' +
+          'AND the patient\'s name, AND either this presentation is purely internal with ' +
+          'nothing a photo could show, or it involves a private body area. "emergency" the ' +
+          'moment the patient describes a very high-risk, potentially life-threatening ' +
+          'presentation - takes priority over every other status (and over needing a name), ' +
+          'even mid-conversation with no further questions asked, and skips any photo ' +
+          'entirely.',
       },
       telehealthViable: {
         type: 'boolean',
@@ -77,8 +92,20 @@ const INTAKE_TOOL = {
           'Whether a telehealth (video call) visit could reasonably substitute for seeing ' +
           'this patient in person, based on what they have said so far.',
       },
+      patientFirstName: {
+        type: ['string', 'null'],
+        description:
+          'The patient\'s first name, parsed from their answer to the name question - ' +
+          'null until asked and answered.',
+      },
+      patientLastInitial: {
+        type: ['string', 'null'],
+        description:
+          'A single capitalized letter - the first letter of the patient\'s last name, ' +
+          'parsed from their answer to the name question - null until asked and answered.',
+      },
     },
-    required: ['reply', 'status', 'telehealthViable'],
+    required: ['reply', 'status', 'telehealthViable', 'patientFirstName', 'patientLastInitial'],
   },
 };
 
@@ -106,10 +133,11 @@ class LlmService {
     this.apiVersion = apiVersion;
   }
 
-  // Returns { reply, status, telehealthViable }, status one of 'asking' |
-  // 'ready_for_photo' | 'ready_no_photo' | 'emergency'. Forced tool-use (not
-  // free-text) so this is structured rather than parsed out of prose - same
-  // pattern synthesizeAcuity/classify_findings already use.
+  // Returns { reply, status, telehealthViable, patientFirstName,
+  // patientLastInitial }, status one of 'asking' | 'ready_for_photo' |
+  // 'ready_no_photo' | 'emergency'. Forced tool-use (not free-text) so this
+  // is structured rather than parsed out of prose - same pattern
+  // synthesizeAcuity/classify_findings already use.
   async sendMessage(session, message) {
     this._assertConfigured();
     const messages = [
