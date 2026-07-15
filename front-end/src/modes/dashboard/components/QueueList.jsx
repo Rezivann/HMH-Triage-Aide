@@ -1,6 +1,18 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import AutoFloorBadge from './AutoFloorBadge';
 
+const OVERRIDE_LABELS = {
+  fixed_score: (value) => `Fixed: ${value}`,
+  positionFloor: (value) => `Floor: #${value}`,
+  dismiss_auto: () => 'Auto-floor dismissed',
+};
+
+function describeOverride(override) {
+  if (!override) return null;
+  const describe = OVERRIDE_LABELS[override.type];
+  return describe ? describe(override.value) : override.type;
+}
+
 export default function QueueList({ queue, onSelect }) {
   if (queue.length === 0) return <p>No patients in the queue.</p>;
 
@@ -11,6 +23,7 @@ export default function QueueList({ queue, onSelect }) {
           <th>#</th>
           <th>Session</th>
           <th>Score</th>
+          <th>Override</th>
           <th></th>
         </tr>
       </thead>
@@ -33,6 +46,13 @@ export default function QueueList({ queue, onSelect }) {
               <td className="tabular-nums">{session.position}</td>
               <td className="tabular-nums">{session.sessionId}</td>
               <td className="tabular-nums">{session.effectiveScore?.toFixed(1)}</td>
+              <td>
+                {session.override && (
+                  <span className="badge badge--accent" title={session.override.note}>
+                    {describeOverride(session.override)}
+                  </span>
+                )}
+              </td>
               <td>
                 <AutoFloorBadge autoFloor={session.autoFloor} floorEffective={session.floorEffective} />
               </td>

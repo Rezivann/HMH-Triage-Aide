@@ -40,6 +40,14 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
         <p className="status-pill status-pill--accent">Auto-floored: {describeReason(session.autoFloor)}</p>
       )}
 
+      <div className="row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+        <p className="tabular-nums" style={{ margin: 0, whiteSpace: 'nowrap' }}>
+          Acuity score: {session.rawScore ?? 'Not yet scored'}
+          {session.decayCategory ? ` (${session.decayCategory})` : ''}
+        </p>
+        <OverrideModal sessionId={sessionId} onOverridden={refresh} />
+      </div>
+
       <WoundPhotoPanel
         imageBase64={session.imageBase64}
         woundType={session.woundType}
@@ -57,7 +65,6 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
       <div className="row">
         <ClaimButton sessionId={sessionId} claimedBy={session.claimedBy} onClaimed={refresh} />
       </div>
-      <OverrideModal sessionId={sessionId} onOverridden={refresh} />
     </motion.div>
   );
 }
