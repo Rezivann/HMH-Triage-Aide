@@ -25,7 +25,7 @@
 // for a specific patient's narrative - Claude picks the category and the
 // nudge, never baselineScore/decayWeightPerMinute/decayCap themselves.
 const DEFAULT_POLICY = {
-  adjustmentRange: 100,
+  adjustmentRange: 50,
   // Nurse-tunable version of ReviewRoutingService's force-escalate score
   // check - a session whose synthesized rawScore reaches this (from either
   // the photo or no-photo path) skips the queue entirely and force-escalates
