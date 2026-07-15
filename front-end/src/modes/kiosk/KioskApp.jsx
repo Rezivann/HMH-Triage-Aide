@@ -55,6 +55,19 @@ export default function KioskApp() {
     }
   }, [intakeStatus]);
 
+  // The LLM already flagged this mid-conversation as very high risk (see
+  // LlmService's "emergency" status) and the backend already force-escalated
+  // the session (kioskController.postMessage) - nothing left to submit, and
+  // no reason to wait: unlike ready_no_photo's 5s "let them read the wrap-up
+  // message" delay, every second here is a second not walking to the front
+  // desk.
+  useEffect(() => {
+    if (intakeStatus === 'emergency') {
+      setEscalated(true);
+      setStep(STEPS.END);
+    }
+  }, [intakeStatus]);
+
   // Landing (warning + Start button) renders immediately, before checking
   // session status - it must never be blocked on the background session
   // creation request finishing. The "Starting your session..."/error states

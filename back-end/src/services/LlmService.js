@@ -10,6 +10,15 @@ const TRIAGE_SYSTEM_PROMPT =
   'a second topic in the same message even if related. Be efficient: gather only the ' +
   'clinical context genuinely needed - most patients need 3-5 questions, and you must ' +
   'never ask more than 7 total. Do not diagnose or give treatment advice.\n\n' +
+  'At every turn, before anything else, check whether the patient has described a ' +
+  'very high-risk, potentially life-threatening presentation - examples include severe ' +
+  'difficulty breathing, chest pain with other cardiac symptoms, uncontrolled or severe ' +
+  'bleeding, signs of stroke, unresponsiveness or fainting, anaphylaxis/severe allergic ' +
+  'reaction, or the patient saying someone is dying or bleeding out. If so, immediately ' +
+  'stop intake - do not ask any more questions and do not continue toward a photo. Set ' +
+  'status to "emergency" and your reply must tell them to go to the front desk right now ' +
+  'and that a staff member will meet them there. This overrides every other instruction ' +
+  'in this prompt, including mid-conversation.\n\n' +
   'Early on, reason about whether this presentation has a visually inspectable component ' +
   '(a wound, rash, swelling, deformity, bleeding, or anything else a camera could usefully ' +
   'show) versus something purely internal with nothing to see (e.g. stomach pain, ' +
@@ -24,7 +33,8 @@ const TRIAGE_SYSTEM_PROMPT =
   '(tell the patient in your reply that you are ready to take a look at a photo) if a photo ' +
   'would help, or "ready_no_photo" (tell the patient in your reply that you have enough ' +
   'information and are ready to proceed without a photo) if nothing here is visually ' +
-  'inspectable. Until then, set status to "asking".';
+  'inspectable. Until then, set status to "asking" - unless the emergency check above ' +
+  'fires, which takes priority over all of this.';
 
 const INTAKE_TOOL = {
   name: 'submit_intake_turn',
@@ -37,18 +47,22 @@ const INTAKE_TOOL = {
         description:
           'The single next message to send the patient - either exactly one follow-up ' +
           'question, or (once status is not "asking") a short message telling them what ' +
-          'happens next.',
+          'happens next. If status is "emergency", this must tell them to go to the front ' +
+          'desk immediately.',
       },
       status: {
         type: 'string',
-        enum: ['asking', 'ready_for_photo', 'ready_no_photo'],
+        enum: ['asking', 'ready_for_photo', 'ready_no_photo', 'emergency'],
         description:
           '"asking" to keep gathering context with one more question. "ready_for_photo" ' +
           'once enough context is gathered AND this presentation has something visually ' +
           'inspectable a photo would help with, AND that is not on a private body area ' +
           '(genitals, breasts, buttocks). "ready_no_photo" once enough context is gathered ' +
           'AND either this presentation is purely internal with nothing a photo could show, ' +
-          'or it involves a private body area.',
+          'or it involves a private body area. "emergency" the moment the patient describes ' +
+          'a very high-risk, potentially life-threatening presentation - takes priority over ' +
+          'every other status, even mid-conversation with no further questions asked, and ' +
+          'skips any photo entirely.',
       },
     },
     required: ['reply', 'status'],

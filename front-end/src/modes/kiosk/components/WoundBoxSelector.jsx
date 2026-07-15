@@ -17,6 +17,8 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
   const [imageUrl, setImageUrl] = useState(null);
   const [box, setBox] = useState(null); // displayed (CSS) pixels, converted to image pixels on confirm
   const [drawStart, setDrawStart] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const url = URL.createObjectURL(imageBlob);
@@ -52,7 +54,13 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
 
   const hasValidBox = box && box.width >= MIN_BOX_SIZE && box.height >= MIN_BOX_SIZE;
 
-  function handleConfirm() {
+  // onConfirm ultimately calls all the way through to KioskController's
+  // /kiosk/photo (capture-quality rejection, ml-service down, etc.) - this
+  // is the one place in the chain that awaits it, so it's the one place
+  // that needs to catch a failure. Without this, a rejection here was an
+  // uncaught promise rejection with zero user-visible feedback: the patient
+  // just saw nothing happen, with no indication they needed to retake.
+  async function handleConfirm() {
     const img = imgRef.current;
 
     // Displayed (CSS) pixels -> the image's actual pixel resolution - the
@@ -61,14 +69,23 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
     const scaleX = img.naturalWidth / img.clientWidth;
     const scaleY = img.naturalHeight / img.clientHeight;
 
-    onConfirm({
-      woundBox: {
-        x: Math.round(box.x * scaleX),
-        y: Math.round(box.y * scaleY),
-        width: Math.round(box.width * scaleX),
-        height: Math.round(box.height * scaleY),
-      },
-    });
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfirm({
+        woundBox: {
+          x: Math.round(box.x * scaleX),
+          y: Math.round(box.y * scaleY),
+          width: Math.round(box.width * scaleX),
+          height: Math.round(box.height * scaleY),
+        },
+      });
+      // No setSubmitting(false) on success - the parent moves on to a
+      // different screen entirely, so there's nothing left to re-enable.
+    } catch (err) {
+      setError(err.message || 'Could not submit the photo - please retake and try again.');
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -107,12 +124,19 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
         )}
       </div>
 
+      {error && <p role="alert">{error}</p>}
+
       <div className="row">
-        <MotionButton type="button" onClick={onRetake}>
+        <MotionButton type="button" onClick={onRetake} disabled={submitting}>
           Retake photo
         </MotionButton>
-        <MotionButton type="button" className="btn-primary" onClick={handleConfirm} disabled={!hasValidBox}>
-          Confirm wound area
+        <MotionButton
+          type="button"
+          className="btn-primary"
+          onClick={handleConfirm}
+          disabled={!hasValidBox || submitting}
+        >
+          {submitting ? 'Submitting...' : 'Confirm wound area'}
         </MotionButton>
       </div>
     </MotionCard>

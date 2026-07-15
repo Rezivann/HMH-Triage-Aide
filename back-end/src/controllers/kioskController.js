@@ -59,11 +59,19 @@ async function postMessage(req, res) {
 
   try {
     const { reply, status: intakeStatus } = await llmService.sendMessage(session, message);
+    const messages = [...session.messages, { role: 'patient', text: message }, { role: 'assistant', text: reply }];
+
+    // A high-risk/life-threatening description short-circuits the rest of
+    // intake right here - no photo, no acuity synthesis, no queue. The
+    // patient needs to walk to the front desk now, not wait on a CV/LLM
+    // round trip that a normal submission would still have to go through.
+    const escalated = intakeStatus === 'emergency';
     const updated = await store.updateSession(sessionId, {
-      messages: [...session.messages, { role: 'patient', text: message }, { role: 'assistant', text: reply }],
+      messages,
+      ...(escalated ? { status: 'force_escalated', queuedAt: new Date().toISOString() } : {}),
     });
 
-    res.json({ reply, intakeStatus, messages: updated.messages });
+    res.json({ reply, intakeStatus, messages: updated.messages, escalated });
   } catch (err) {
     res.status(502).json({ error: 'llm_request_failed', message: err.message });
   }

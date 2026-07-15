@@ -30,7 +30,15 @@ export default function PhotoCaptureFallback({ onCaptured }) {
   const [capturedBlob, setCapturedBlob] = useState(null);
   const [step, setStep] = useState(STEPS.CAMERA);
 
+  // Depends on `step`, not just mount-once - a retake returns to this same
+  // component instance (step flips WOUND_BOX -> CAMERA), and without this
+  // dependency the effect would never re-run: the video element that
+  // remounts on retake would get srcObject = undefined forever, while the
+  // original stream's tracks (attached to a now-gone video element) keep
+  // running - camera indicator stays lit, but nothing is shown.
   useEffect(() => {
+    if (step !== STEPS.CAMERA) return undefined;
+
     let stream;
     navigator.mediaDevices
       ?.getUserMedia({ video: true })
@@ -41,7 +49,7 @@ export default function PhotoCaptureFallback({ onCaptured }) {
       .catch((err) => setError(err.message));
 
     return () => stream?.getTracks().forEach((track) => track.stop());
-  }, []);
+  }, [step]);
 
   async function handleCapture() {
     setChecking(true);

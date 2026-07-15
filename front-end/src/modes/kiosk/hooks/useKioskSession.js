@@ -13,7 +13,7 @@ export function useKioskSession() {
   const [error, setError] = useState(null);
   const [messages, setMessages] = useState([]);
   const [photoResult, setPhotoResult] = useState(null);
-  const [intakeStatus, setIntakeStatus] = useState('asking'); // asking | ready_for_photo | ready_no_photo
+  const [intakeStatus, setIntakeStatus] = useState('asking'); // asking | ready_for_photo | ready_no_photo | emergency
 
   useEffect(() => {
     let cancelled = false;
