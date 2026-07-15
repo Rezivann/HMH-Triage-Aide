@@ -109,7 +109,13 @@ export default function PhotoCaptureFallback({ onCaptured }) {
         onRetake={handleRetake}
         onConfirm={async ({ woundBox }) => {
           const imageBase64 = await blobToBase64(capturedBlob);
-          onCaptured({ imageBase64, woundBox });
+          // Must return (not fire-and-forget) - WoundBoxSelector awaits this
+          // whole chain in its own try/catch, and without returning it here a
+          // failure downstream (kioskController's capture_invalid, ml-service
+          // down, etc.) becomes an unhandled rejection instead of a message
+          // the patient can see, and WoundBoxSelector's "Analyzing..." state
+          // never resets since its own await already resolved.
+          return onCaptured({ imageBase64, woundBox });
         }}
       />
     );

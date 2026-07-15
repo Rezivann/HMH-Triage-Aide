@@ -36,6 +36,13 @@ export default function MobileCaptureApp() {
       setSubmitted(true);
     } catch (err) {
       setError(err);
+      // Re-thrown so WoundBoxSelector's own try/catch also fires - now that
+      // PhotoCaptureFallback's onConfirm properly propagates this promise,
+      // WoundBoxSelector needs the rejection to reset its "Analyzing..."
+      // state and re-enable Retake/Confirm; otherwise this page's error
+      // banner would show while the capture UI underneath stayed stuck
+      // spinning forever.
+      throw err;
     }
   }
 
