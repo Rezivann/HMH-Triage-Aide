@@ -5,7 +5,7 @@ const REASON_LABELS = {
   low_llm_confidence: 'Low LLM confidence',
 };
 
-function describeReason({ reason, confidence }) {
+export function describeReason({ reason, confidence }) {
   const label = REASON_LABELS[reason] || reason;
   if (!label) return null;
   return typeof confidence === 'number' ? `${label} (${confidence.toFixed(2)})` : label;

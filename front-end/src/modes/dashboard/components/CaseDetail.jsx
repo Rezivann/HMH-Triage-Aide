@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { dashboardRequest } from '../../../shared/api/apiClient';
+import { describeReason } from './AutoFloorBadge';
 import ClaimButton from './ClaimButton';
 import OverrideModal from './OverrideModal';
 import WoundPhotoPanel from './WoundPhotoPanel';
@@ -35,6 +36,9 @@ export default function CaseDetail({ sessionId, onClose, onChanged }) {
         </MotionButton>
       </div>
       <p className="status-pill status-pill--neutral">Status: {session.status}</p>
+      {session.autoFloor?.active && (
+        <p className="status-pill status-pill--accent">Auto-floored: {describeReason(session.autoFloor)}</p>
+      )}
 
       <WoundPhotoPanel
         imageBase64={session.imageBase64}
