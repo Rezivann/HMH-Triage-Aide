@@ -4,7 +4,7 @@ import PhotoCaptureFallback from './components/PhotoCaptureFallback';
 import CriticalAlert from './components/CriticalAlert';
 import PageShell from '../../shared/components/PageShell';
 import MotionCard from '../../shared/components/MotionCard';
-import { mobileCaptureRequest } from '../../shared/api/apiClient';
+import { mobileCaptureRequest, describePhotoSubmitError } from '../../shared/api/apiClient';
 
 // The page a patient's own phone lands on after scanning PhotoCaptureQR's
 // code. photoToken is a short-lived, single-session-scoped JWT (minted at
@@ -63,7 +63,7 @@ export default function MobileCaptureApp() {
   return (
     <PageShell>
       <h1>LLMTriage</h1>
-      {error && <p role="alert">Could not submit photo: {error.message}. Please try again.</p>}
+      {error && <p role="alert">{describePhotoSubmitError(error)}</p>}
       <PhotoCaptureFallback onCaptured={handleCaptured} />
     </PageShell>
   );

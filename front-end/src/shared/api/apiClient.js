@@ -50,6 +50,15 @@ function mobileCaptureRequest(path, options = {}) {
   return request(path, options);
 }
 
+// A thrown request()'s .message is just the backend's raw error code (e.g.
+// "capture_invalid") - fine for logging, not for a patient to read. Shared by
+// WoundBoxSelector and MobileCaptureApp, the two places a photo submission
+// failure reaches a person.
+function describePhotoSubmitError(err) {
+  if (err?.body?.error === 'capture_invalid') return "That photo is too blurry - please retake it.";
+  return err?.message || 'Could not submit the photo - please retake and try again.';
+}
+
 export {
   BASE_URL,
   NURSE_TOKEN_STORAGE_KEY,
@@ -58,4 +67,5 @@ export {
   dashboardRequest,
   trackRequest,
   mobileCaptureRequest,
+  describePhotoSubmitError,
 };

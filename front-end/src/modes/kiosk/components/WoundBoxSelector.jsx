@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import MotionCard from '../../../shared/components/MotionCard';
 import MotionButton from '../../../shared/components/MotionButton';
 import Spinner from '../../../shared/components/Spinner';
+import { describePhotoSubmitError } from '../../../shared/api/apiClient';
 
 // Shown right after capture, before the photo is submitted - the only
 // box-draw step now (no nail-box step; this pipeline no longer estimates
@@ -84,7 +85,7 @@ export default function WoundBoxSelector({ imageBlob, onConfirm, onRetake }) {
       // No setSubmitting(false) on success - the parent moves on to a
       // different screen entirely, so there's nothing left to re-enable.
     } catch (err) {
-      setError(err.message || 'Could not submit the photo - please retake and try again.');
+      setError(describePhotoSubmitError(err));
       setSubmitting(false);
     }
   }
