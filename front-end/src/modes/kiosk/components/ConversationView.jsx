@@ -27,6 +27,7 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   const [listening, setListening] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState(null);
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -34,6 +35,7 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
 
   function startListening() {
     if (!SpeechRecognitionCtor) return;
+    setVoiceError(null);
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
@@ -73,7 +75,20 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
         setListening(true);
       })
       .catch((err) => {
+        // Without this, a denied/blocked mic permission left voiceMode true
+        // and listening false forever - the UI just sat on "Waiting..." with
+        // the Stop button, no indication anything failed and no way to
+        // retry short of leaving the screen. Especially common on mobile,
+        // where a previously-denied site permission rejects immediately
+        // with no prompt at all.
         console.error('Microphone permission request failed:', err.name, err.message);
+        setVoiceError(
+          err.name === 'NotAllowedError'
+            ? 'Microphone access was denied. Please allow microphone access for this site and try again.'
+            : `Could not access the microphone: ${err.message}`
+        );
+        setVoiceMode(false);
+        setListening(false);
       });
   }
 
@@ -105,11 +120,17 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   // SpeechRecognition path above, since there's no "recognition ended"
   // signal to resume on).
   async function startRecording() {
+    setVoiceError(null);
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
       console.error('Microphone permission request failed:', err.name, err.message);
+      setVoiceError(
+        err.name === 'NotAllowedError'
+          ? 'Microphone access was denied. Please allow microphone access for this site and try again.'
+          : `Could not access the microphone: ${err.message}`
+      );
       return;
     }
 
@@ -128,6 +149,7 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
         if (transcript?.trim()) onSend(transcript.trim());
       } catch (err) {
         console.error('Transcription failed:', err.message);
+        setVoiceError(`Could not transcribe that recording: ${err.message}. Please try again.`);
       } finally {
         setTranscribing(false);
       }
@@ -228,6 +250,8 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
           Send
         </MotionButton>
       </form>
+
+      {voiceError && <p role="alert">{voiceError}</p>}
 
       {!SpeechRecognitionCtor && !canRecordAudio && (
         // Visible instead of just hiding the button - "nothing renders" and

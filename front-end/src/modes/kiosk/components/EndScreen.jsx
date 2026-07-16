@@ -1,6 +1,7 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { motion } from 'framer-motion';
 import MotionCard from '../../../shared/components/MotionCard';
+import CopyableLink from '../../../shared/components/CopyableLink';
 
 // Final kiosk screen - patient handoff after intake ends (either the photo
 // or no-photo path), before they leave the kiosk for the waiting room.
@@ -51,11 +52,8 @@ export default function EndScreen({ sessionId, trackUrl }) {
           >
             <QRCodeSVG value={trackUrl} size={220} />
           </motion.div>
-          <p
-            style={{ margin: 0, wordBreak: 'break-all', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}
-          >
-            Or go to: <code>{trackUrl}</code>
-          </p>
+          <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Or go to:</p>
+          <CopyableLink url={trackUrl} />
         </>
       )}
       <p className="tabular-nums" style={{ color: 'var(--color-text-muted)' }}>

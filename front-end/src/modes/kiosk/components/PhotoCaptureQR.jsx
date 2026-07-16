@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion } from 'framer-motion';
 import { kioskRequest } from '../../../shared/api/apiClient';
+import CopyableLink from '../../../shared/components/CopyableLink';
 
 // Primary photo capture path: patient scans this QR with their own phone,
 // which opens MobileCaptureApp - a session-scoped page giving full range of
@@ -48,9 +49,8 @@ export default function PhotoCaptureQR({ sessionId, photoToken, onPhoneSubmitted
       >
         <QRCodeSVG value={qrTargetUrl} size={220} />
       </motion.div>
-      <p style={{ margin: 0, wordBreak: 'break-all', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-        Or go to: <code>{qrTargetUrl}</code>
-      </p>
+      <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Or go to:</p>
+      <CopyableLink url={qrTargetUrl} />
       <motion.p
         className="status-pill status-pill--neutral"
         animate={{ opacity: [1, 0.55, 1] }}
