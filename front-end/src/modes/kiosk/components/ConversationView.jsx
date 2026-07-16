@@ -116,45 +116,27 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
 
     recognitionRef.current = recognition;
 
-    // Some embedded/kiosk-mode Chromium browsers (seen on Webex Desk
-    // hardware) never surface the native mic permission prompt when
-    // SpeechRecognition.start() is called directly - getUserMedia() is a
-    // more reliably-honored trigger for that same permission prompt across
-    // browsers. The stream itself isn't used (SpeechRecognition opens its
-    // own), it's purely to force the prompt before recognition tries to run.
-    navigator.mediaDevices
-      ?.getUserMedia({ audio: true })
-      .then((stream) => {
-        stream.getTracks().forEach((track) => track.stop());
-        // On mobile, calling recognition.start() in the same tick as
-        // stopping this stream races the OS's mic-hardware teardown -
-        // SpeechRecognition's own internal capture would start and die
-        // almost instantly with no result (a single frame of "Listening..."
-        // flashing straight back to "Waiting..."), which the auto-restart
-        // above then repeated forever. A short gap lets the hardware
-        // actually finish releasing first.
-        setTimeout(() => {
-          if (!voiceModeRef.current) return;
-          recognition.start();
-          setListening(true);
-        }, 300);
-      })
-      .catch((err) => {
-        // Without this, a denied/blocked mic permission left voiceMode true
-        // and listening false forever - the UI just sat on "Waiting..." with
-        // the Stop button, no indication anything failed and no way to
-        // retry short of leaving the screen. Especially common on mobile,
-        // where a previously-denied site permission rejects immediately
-        // with no prompt at all.
-        console.error('Microphone permission request failed:', err.name, err.message);
-        setVoiceError(
-          err.name === 'NotAllowedError'
-            ? 'Microphone access was denied. Please allow microphone access for this site and try again.'
-            : `Could not access the microphone: ${err.message}`
-        );
-        setVoiceModeAndRef(false);
-        setListening(false);
-      });
+    // Called directly and synchronously - no getUserMedia priming step
+    // beforehand. That priming (grab a stream just to force a permission
+    // prompt, then stop it and start recognition separately) was meant for
+    // embedded browsers that don't reliably prompt on their own, but on real
+    // mobile Chrome it caused exactly the reported bug: the getUserMedia
+    // stream release raced against SpeechRecognition's own mic acquisition,
+    // AND any delay in between (needed to dodge that race) pushed
+    // recognition.start() outside the original tap's user-activation window
+    // - Chrome then silently denied it, showing as "access allowed" (the
+    // getUserMedia prompt succeeded) immediately followed by "microphone
+    // access denied" (the delayed, no-longer-gesture-backed recognition.start()
+    // call failing). Calling it directly, in the same tick as the tap that
+    // triggered it, avoids both problems at once.
+    try {
+      recognition.start();
+      setListening(true);
+    } catch (err) {
+      console.error('SpeechRecognition failed to start:', err.name, err.message);
+      setVoiceError(`Could not start listening: ${err.message}`);
+      setVoiceModeAndRef(false);
+    }
   }
 
   function handleStartVoice() {
