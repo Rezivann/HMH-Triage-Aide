@@ -39,6 +39,13 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   // event handler captured earlier).
   const voiceModeRef = useRef(false);
   const gotResultRef = useRef(false);
+  // Caps the auto-restart-on-no-result loop - without this, a persistent
+  // failure to actually capture audio (e.g. the mic hardware race below, on
+  // a device/browser where the delay isn't enough) would restart forever,
+  // silently flashing Listening/Waiting rather than ever telling the
+  // patient something's actually wrong.
+  const consecutiveNoResultsRef = useRef(0);
+  const MAX_CONSECUTIVE_NO_RESULTS = 3;
 
   function setVoiceModeAndRef(value) {
     voiceModeRef.current = value;
@@ -64,6 +71,7 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
 
     recognition.onresult = (event) => {
       gotResultRef.current = true;
+      consecutiveNoResultsRef.current = 0;
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       if (transcript) onSend(transcript);
     };
@@ -73,8 +81,16 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
       // pause, with no error and no result at all - previously this just
       // went silent, stuck on "Waiting..." until the patient noticed and
       // manually stopped/restarted. Auto-restart instead, as long as voice
-      // mode is still on (a real error or Stop already turned it off).
+      // mode is still on (a real error or Stop already turned it off) and
+      // we haven't already failed several times in a row.
       if (!gotResultRef.current && voiceModeRef.current) {
+        consecutiveNoResultsRef.current += 1;
+        if (consecutiveNoResultsRef.current > MAX_CONSECUTIVE_NO_RESULTS) {
+          setVoiceError("Having trouble hearing you - please try typing instead, or tap Start Talking to try again.");
+          setVoiceModeAndRef(false);
+          consecutiveNoResultsRef.current = 0;
+          return;
+        }
         setTimeout(() => {
           if (voiceModeRef.current) startListening();
         }, 300);
@@ -110,8 +126,18 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
       ?.getUserMedia({ audio: true })
       .then((stream) => {
         stream.getTracks().forEach((track) => track.stop());
-        recognition.start();
-        setListening(true);
+        // On mobile, calling recognition.start() in the same tick as
+        // stopping this stream races the OS's mic-hardware teardown -
+        // SpeechRecognition's own internal capture would start and die
+        // almost instantly with no result (a single frame of "Listening..."
+        // flashing straight back to "Waiting..."), which the auto-restart
+        // above then repeated forever. A short gap lets the hardware
+        // actually finish releasing first.
+        setTimeout(() => {
+          if (!voiceModeRef.current) return;
+          recognition.start();
+          setListening(true);
+        }, 300);
       })
       .catch((err) => {
         // Without this, a denied/blocked mic permission left voiceMode true
