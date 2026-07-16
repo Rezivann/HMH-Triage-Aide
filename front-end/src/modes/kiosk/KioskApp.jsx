@@ -162,7 +162,11 @@ export default function KioskApp() {
                 landing screen shown again over this same patient's stale
                 session/messages/tokens still sitting in useKioskSession's
                 state. */}
-            <MotionButton type="button" onClick={() => window.location.assign('/kiosk')}>
+            <MotionButton
+              type="button"
+              style={{ marginTop: 'var(--space-3)' }}
+              onClick={() => window.location.assign('/kiosk')}
+            >
               Back to Home
             </MotionButton>
           </motion.div>

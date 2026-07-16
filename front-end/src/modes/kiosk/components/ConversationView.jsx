@@ -32,10 +32,30 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const lastHeardIndexRef = useRef(-1);
+  // Plain refs, not just the voiceMode/gotResult state - onend/onerror are
+  // closures created once per recognition instance, so they'd otherwise see
+  // whatever voiceMode was at the moment startListening() was called, not
+  // its latest value (a React state variable isn't a live binding inside an
+  // event handler captured earlier).
+  const voiceModeRef = useRef(false);
+  const gotResultRef = useRef(false);
+
+  function setVoiceModeAndRef(value) {
+    voiceModeRef.current = value;
+    setVoiceMode(value);
+  }
+
+  // Fatal error codes need the patient to actually do something (grant
+  // permission, check their mic) - everything else (no-speech, aborted,
+  // network) is exactly the kind of transient hiccup mobile's more
+  // aggressive pause-detection causes constantly, and should just resume
+  // listening rather than reading as "voice is broken."
+  const FATAL_SPEECH_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
 
   function startListening() {
     if (!SpeechRecognitionCtor) return;
     setVoiceError(null);
+    gotResultRef.current = false;
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
@@ -43,20 +63,39 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
+      gotResultRef.current = true;
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       if (transcript) onSend(transcript);
     };
-    // Recognition stops itself after a pause in speech (one turn) - this
-    // just clears the "listening" indicator, not an error state. Resuming
-    // for the next turn happens once the assistant's reply arrives (see the
-    // effect below), not from here, so it doesn't restart mid-request.
-    recognition.onend = () => setListening(false);
-    recognition.onerror = (event) => {
-      // event.error is one of SpeechRecognition's fixed error codes
-      // (no-speech, audio-capture, not-allowed, network, etc) - surfaced to
-      // the console since this was previously failing completely silently.
-      console.error('SpeechRecognition error:', event.error);
+    recognition.onend = () => {
       setListening(false);
+      // Mobile browsers routinely end recognition mid-sentence on a brief
+      // pause, with no error and no result at all - previously this just
+      // went silent, stuck on "Waiting..." until the patient noticed and
+      // manually stopped/restarted. Auto-restart instead, as long as voice
+      // mode is still on (a real error or Stop already turned it off).
+      if (!gotResultRef.current && voiceModeRef.current) {
+        setTimeout(() => {
+          if (voiceModeRef.current) startListening();
+        }, 300);
+      }
+    };
+    recognition.onerror = (event) => {
+      // event.error is one of SpeechRecognition's fixed error codes -
+      // surfaced to the console since this was previously failing
+      // completely silently either way.
+      console.error('SpeechRecognition error:', event.error);
+      if (FATAL_SPEECH_ERRORS.has(event.error)) {
+        setVoiceError(
+          event.error === 'audio-capture'
+            ? 'No microphone could be found. Please check your device and try again.'
+            : 'Microphone access was denied. Please allow microphone access for this site and try again.'
+        );
+        setVoiceModeAndRef(false);
+      }
+      setListening(false);
+      // onend always fires right after onerror, and will see the
+      // just-updated voiceModeRef - no separate restart logic needed here.
     };
 
     recognitionRef.current = recognition;
@@ -87,13 +126,13 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
             ? 'Microphone access was denied. Please allow microphone access for this site and try again.'
             : `Could not access the microphone: ${err.message}`
         );
-        setVoiceMode(false);
+        setVoiceModeAndRef(false);
         setListening(false);
       });
   }
 
   function handleStartVoice() {
-    setVoiceMode(true);
+    setVoiceModeAndRef(true);
     // First turn has no assistant reply to wait for - start listening the
     // moment voice mode begins, same as a patient walking up and just
     // starting to talk.
@@ -101,7 +140,7 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   }
 
   function handleStopVoice() {
-    setVoiceMode(false);
+    setVoiceModeAndRef(false);
     recognitionRef.current?.stop();
     setListening(false);
   }
@@ -183,15 +222,20 @@ export default function ConversationView({ messages, onSend, onTranscribe, onCon
   }, [messages, voiceMode, intakeStatus]);
 
   // Intake wrapped up (or the screen changed away) - nothing left to listen
-  // for, so stop cleanly rather than leaving the mic hot.
+  // for, so stop cleanly rather than leaving the mic hot. voiceModeRef must
+  // clear too, not just the recognition itself - stop() fires onend just
+  // like a natural pause does, and onend's own auto-restart-on-no-result
+  // logic would otherwise kick back in right after this intentional stop.
   useEffect(() => {
     if (intakeStatus !== 'asking') {
+      voiceModeRef.current = false;
       recognitionRef.current?.stop();
     }
   }, [intakeStatus]);
 
   useEffect(() => {
     return () => {
+      voiceModeRef.current = false;
       recognitionRef.current?.stop();
     };
   }, []);
