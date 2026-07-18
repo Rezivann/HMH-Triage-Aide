@@ -1,4 +1,4 @@
-# HMH Triage Aide
+# HMH Triage Aide — AI-Assisted Urgent-Care Intake and Prioritization System
 
 A multimodal intake platform that combines conversational AI, wound-image analysis, configurable acuity policies, and human clinical oversight to help urgent-care teams identify higher-priority patients sooner.
 
