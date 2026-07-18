@@ -2,22 +2,15 @@ const express = require('express');
 const nurseAuth = require('../middleware/nurseAuth');
 const auditLog = require('../middleware/auditLog');
 const dashboardController = require('../controllers/dashboardController');
-const duoAuthController = require('../controllers/duoAuthController');
-const { nodeEnv, allowDevLoginInProduction } = require('../config/env');
 
 const router = express.Router();
 
-// Dev-only - real Duo SSO replaces this route entirely, not just its logic.
-// allowDevLoginInProduction is a deliberate, temporary escape hatch (see
-// config/env.js) for when Duo access itself is unavailable.
-if (nodeEnv !== 'production' || allowDevLoginInProduction) {
-  router.post('/dev-login', dashboardController.devLogin);
-}
-
-// Public - these two routes *are* the auth mechanism, so they run before
-// nurseAuth rather than behind it (there's no session yet to validate).
-router.get('/login', duoAuthController.login);
-router.get('/duo-callback', duoAuthController.callback);
+// The only nurse-login mechanism now that Duo SSO has been removed - not
+// gated behind nurseAuth (there's no session yet to validate). Note this
+// means anyone with the URL can currently mint a nurse session for any
+// nurseId/siteAccess - there is no real authentication here anymore. Revisit
+// before handling real patient data.
+router.post('/dev-login', dashboardController.devLogin);
 
 router.use(nurseAuth, auditLog);
 

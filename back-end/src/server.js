@@ -1,6 +1,6 @@
 const http = require('http');
 const app = require('./app');
-const { port, nodeEnv, allowDevLoginInProduction } = require('./config/env');
+const { port, nodeEnv } = require('./config/env');
 const { connectDb } = require('./db/connect');
 const dashboardSocket = require('./websocket/dashboardSocket');
 const escalationSweep = require('./jobs/escalationSweep');
@@ -15,7 +15,7 @@ connectDb()
     escalationSweep.start();
     server.listen(port, () => {
       console.log(`[server] listening on port ${port}`);
-      console.log(`[server] nodeEnv=${JSON.stringify(nodeEnv)} allowDevLoginInProduction=${allowDevLoginInProduction}`);
+      console.log(`[server] nodeEnv=${JSON.stringify(nodeEnv)}`);
     });
   })
   .catch((err) => {

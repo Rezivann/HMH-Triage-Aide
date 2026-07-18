@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { nurseSessionSecret } = require('../config/env');
 
-// Validates the session token issued *after* Duo SSO + MFA + device health check
-// succeed elsewhere - this middleware never talks to Duo directly.
+// Validates the session token minted by dashboardController.devLogin - the
+// only nurse-login mechanism (Duo SSO has been removed).
 function nurseAuth(req, res, next) {
   const authHeader = req.header('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;

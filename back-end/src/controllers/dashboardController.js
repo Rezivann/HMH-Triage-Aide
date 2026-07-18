@@ -5,9 +5,11 @@ const { sortQueue } = require('../utils/queueSort');
 const { pinConflictCheck } = require('../utils/pinConflictCheck');
 const { nurseSessionSecret } = require('../config/env');
 
-// Dev-only stand-in for real Duo SSO - mints a nurse session token directly.
-// Not gated behind nurseAuth (there's no session yet to validate); the route
-// mounting this in dashboardRoutes.js is what excludes it from production.
+// The only nurse-login mechanism (Duo SSO has been removed) - mints a nurse
+// session token directly from whatever nurseId/siteAccess the caller sends.
+// Not gated behind nurseAuth (there's no session yet to validate) and, per
+// dashboardRoutes.js, not gated by environment either - there is no real
+// authentication here.
 function devLogin(req, res) {
   const { nurseId, siteAccess } = req.body;
   if (!nurseId || !Array.isArray(siteAccess)) {
@@ -101,8 +103,6 @@ async function claim(req, res) {
   const session = await store.getSession(id);
   if (!session) return res.status(404).json({ error: 'session_not_found' });
 
-  // TODO: replace with ContactCenterService.queueToAgent() once a real Webex
-  // CC tenant is provisioned (see services/ContactCenterService.js).
   // status: 'claimed' (already a valid Session enum value - see
   // models/Session.js - just never actually set here before) is what pulls
   // this patient out of every status === 'queued' query in one place:
